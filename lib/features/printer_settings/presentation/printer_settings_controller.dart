@@ -31,6 +31,7 @@ class PrinterSetupState {
     this.saved = false,
     this.isTestPrinting = false,
     this.testPrintMessage,
+    this.isEditingExisting = false,
   });
 
   final String name;
@@ -51,8 +52,16 @@ class PrinterSetupState {
   final bool isTestPrinting;
   final String? testPrintMessage;
 
+  /// True when this screen was opened to edit an already-saved printer.
+  /// Its device address is already known and persisted, so editing fields
+  /// like name/DPI/label size shouldn't require re-discovering and
+  /// re-connecting to the physical printer before Save is enabled.
+  final bool isEditingExisting;
+
   bool get canSave =>
-      name.trim().isNotEmpty && connectState == DeviceConnectState.connected;
+      name.trim().isNotEmpty &&
+      (connectState == DeviceConnectState.connected ||
+          (isEditingExisting && selectedDevice != null));
 
   PrinterSetupState copyWith({
     String? name,
@@ -69,6 +78,7 @@ class PrinterSetupState {
     bool? saved,
     bool? isTestPrinting,
     String? Function()? testPrintMessage,
+    bool? isEditingExisting,
   }) {
     return PrinterSetupState(
       name: name ?? this.name,
@@ -87,24 +97,52 @@ class PrinterSetupState {
       isTestPrinting: isTestPrinting ?? this.isTestPrinting,
       testPrintMessage:
           testPrintMessage != null ? testPrintMessage() : this.testPrintMessage,
+      isEditingExisting: isEditingExisting ?? this.isEditingExisting,
     );
   }
 }
 
 class PrinterSetupController extends StateNotifier<PrinterSetupState> {
-  PrinterSetupController(this._ref, PrinterConfig? existing)
-      : super(
-          existing == null
-              ? const PrinterSetupState()
-              : PrinterSetupState(
-                  name: existing.name,
-                  connectionType: existing.connectionType,
-                  printerModelId: existing.printerModelId,
-                  dpi: existing.dpi,
-                  labelSizeId: existing.labelSizeId,
-                ),
-        ) {
+  factory PrinterSetupController(Ref ref, PrinterConfig? existing) {
+    if (existing == null) {
+      return PrinterSetupController._(ref, null, const PrinterSetupState());
+    }
+
+    // The printer's address is already known and persisted, so editing
+    // metadata (name/DPI/label size) doesn't require a fresh connection.
+    // If it also happens to be connected right now, reflect that so the
+    // "Test Print" action keeps working against the live connection.
+    final session = ref.read(printerSessionProvider);
+    final alreadyConnected = session.config?.id == existing.id &&
+        session.status == PrinterConnectionStatus.connected;
+
+    return PrinterSetupController._(
+      ref,
+      existing,
+      PrinterSetupState(
+        name: existing.name,
+        connectionType: existing.connectionType,
+        printerModelId: existing.printerModelId,
+        dpi: existing.dpi,
+        labelSizeId: existing.labelSizeId,
+        selectedDevice: existing.toPrinterDevice(),
+        connectState: alreadyConnected
+            ? DeviceConnectState.connected
+            : DeviceConnectState.idle,
+        isEditingExisting: true,
+      ),
+    );
+  }
+
+  PrinterSetupController._(this._ref, PrinterConfig? existing, PrinterSetupState initial)
+      : super(initial) {
     _existingId = existing?.id;
+    if (initial.connectState == DeviceConnectState.connected) {
+      // Reuse the session's already-connected transport instead of opening
+      // a second connection, so Test Print and Save act on the same link.
+      _pendingPrinter = _ref.read(printerSessionProvider.notifier).printer;
+      _reusingSessionPrinter = true;
+    }
   }
 
   final Ref _ref;
@@ -112,11 +150,22 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
   LabelPrinter? _pendingPrinter;
   final ZplEncoder _encoder = const ZplEncoder();
 
+  /// True while [_pendingPrinter] is actually the live session printer
+  /// (reused, not opened by this screen) — it must never be disposed here.
+  bool _reusingSessionPrinter = false;
+
+  void _disposePendingPrinter() {
+    if (!_reusingSessionPrinter) {
+      _pendingPrinter?.dispose();
+    }
+    _pendingPrinter = null;
+    _reusingSessionPrinter = false;
+  }
+
   void setName(String value) => state = state.copyWith(name: value);
 
   void setConnectionType(PrinterConnectionType type) {
-    _pendingPrinter?.dispose();
-    _pendingPrinter = null;
+    _disposePendingPrinter();
     state = state.copyWith(
       connectionType: type,
       discoveredDevices: [],
@@ -154,7 +203,7 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
   }
 
   Future<void> connectTo(PrinterDevice device) async {
-    _pendingPrinter?.dispose();
+    _disposePendingPrinter();
     _pendingPrinter = PrinterRegistry.create(state.connectionType);
 
     state = state.copyWith(
@@ -231,10 +280,7 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
 
   Future<bool> save() async {
     final device = state.selectedDevice;
-    final printer = _pendingPrinter;
-    if (device == null ||
-        printer == null ||
-        state.connectState != DeviceConnectState.connected) {
+    if (device == null || !state.canSave) {
       state = state.copyWith(
         errorMessage: () => 'Connect a printer before saving.',
       );
@@ -259,22 +305,38 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
       labelSizeId: state.labelSizeId,
     );
 
-    await _ref.read(printerSessionProvider.notifier).adopt(config, printer);
-    _pendingPrinter = null;
+    final freshPrinter = _pendingPrinter;
+    final sessionNotifier = _ref.read(printerSessionProvider.notifier);
+    if (freshPrinter != null &&
+        !_reusingSessionPrinter &&
+        state.connectState == DeviceConnectState.connected) {
+      // A new connection was made in this screen (new setup, or the user
+      // re-picked a device while editing) — hand it off as the live printer.
+      await sessionNotifier.adopt(config, freshPrinter);
+      _pendingPrinter = null;
+    } else {
+      // Editing metadata only; the live connection (if any) is untouched.
+      await sessionNotifier.updateConfig(config);
+    }
+
     state = state.copyWith(isSaving: false, saved: true);
     return true;
   }
 
   @override
   void dispose() {
-    _pendingPrinter?.dispose();
+    _disposePendingPrinter();
     super.dispose();
   }
 }
 
 final printerSetupControllerProvider = StateNotifierProvider.autoDispose<
     PrinterSetupController, PrinterSetupState>((ref) {
-  final existing = ref.watch(printerSessionProvider).config;
+  // Read (not watch): this should seed the form once from whatever printer
+  // is configured when the settings screen opens, not rebuild the whole
+  // controller — and discard in-progress edits — every time the session
+  // changes, which also happens as a side effect of save() itself.
+  final existing = ref.read(printerSessionProvider).config;
   return PrinterSetupController(ref, existing);
 });
 

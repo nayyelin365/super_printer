@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/printer/models/connection_type.dart';
 import '../../../core/printer/models/label_size.dart';
 import '../../../shared/theme/app_theme.dart';
+import '../../printer_workspace/presentation/app_section_controller.dart';
+import '../../../shared/widgets/app_sidebar.dart';
 import 'printer_settings_controller.dart';
 import 'widgets/discovered_device_tile.dart';
 
@@ -23,31 +25,52 @@ class PrinterSettingsScreen extends ConsumerWidget {
       }
     });
 
-    return Container(
-      color: Colors.black.withValues(alpha: 0.35),
-      alignment: Alignment.center,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(color: Colors.black26, blurRadius: 24, offset: Offset(0, 8)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Printer Settings',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+    void close() => ref.read(appSectionProvider.notifier).state = AppSection.print;
+
+    return GestureDetector(
+      onTap: close,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.35),
+        alignment: Alignment.center,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: GestureDetector(
+              onTap: () {}, // absorb taps so the card itself doesn't close the dialog
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 24, offset: Offset(0, 8)),
+                  ],
                 ),
-                const SizedBox(height: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Printer Settings',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: close,
+                          icon: const Icon(Icons.close),
+                          tooltip: 'Close',
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
 
                 _FieldLabel('Name'),
                 TextFormField(
@@ -212,7 +235,9 @@ class PrinterSettingsScreen extends ConsumerWidget {
                         : const Text('Save'),
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),

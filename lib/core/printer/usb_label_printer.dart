@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_serial_communication/flutter_serial_communication.dart';
 import 'package:flutter_serial_communication/models/device_info.dart';
 
+import 'chunked_writer.dart';
 import 'label_printer.dart';
 import 'models/connection_type.dart';
 import 'models/printer_calibration.dart';
@@ -133,6 +134,7 @@ class UsbLabelPrinter implements LabelPrinter {
     required int width,
     required int height,
     PrinterCalibration calibration = const PrinterCalibration(),
+    int copies = 1,
   }) async {
     if (_connectedDevice == null) {
       throw const PrinterException(
@@ -146,6 +148,7 @@ class UsbLabelPrinter implements LabelPrinter {
       width: width,
       height: height,
       calibration: calibration,
+      copies: copies,
     );
 
     await _write(zpl);
@@ -163,13 +166,20 @@ class UsbLabelPrinter implements LabelPrinter {
 
   Future<void> _write(String zpl) async {
     try {
-      final sent = await _serial.write(Uint8List.fromList(utf8.encode(zpl)));
-      if (!sent) {
-        throw const PrinterException(
-          PrinterErrorCode.communicationError,
-          'Failed to send label data to the printer.',
-        );
-      }
+      await ChunkedWriter.write(
+        utf8.encode(zpl),
+        (chunk) async {
+          final sent = await _serial.write(Uint8List.fromList(chunk));
+          if (!sent) {
+            throw const PrinterException(
+              PrinterErrorCode.communicationError,
+              'Failed to send label data to the printer.',
+            );
+          }
+        },
+        chunkSize: 512,
+        delayMs: 20,
+      );
     } on PrinterException {
       rethrow;
     } catch (e) {

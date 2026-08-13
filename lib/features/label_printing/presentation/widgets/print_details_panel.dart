@@ -6,6 +6,8 @@ import '../../../../core/printer/label_printer.dart';
 import '../../../../core/printer/printer_session_controller.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../../shared/widgets/app_sidebar.dart';
+import '../../../printer_workspace/presentation/app_section_controller.dart';
 import '../label_print_controller.dart';
 
 class PrintDetailsPanel extends ConsumerWidget {
@@ -48,6 +50,15 @@ class PrintDetailsPanel extends ConsumerWidget {
                 ),
               ),
               StatusBadge(status: session.status),
+              IconButton(
+                onPressed: () =>
+                    ref.read(appSectionProvider.notifier).state = AppSection.settings,
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                tooltip: session.config == null ? 'Set up printer' : 'Edit printer settings',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                padding: EdgeInsets.zero,
+              ),
             ],
           ),
           if (session.status != PrinterConnectionStatus.connected)
@@ -127,22 +138,31 @@ class PrintDetailsPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
 
-          const _SectionLabel('BARCODE'),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: AppTheme.surface,
               borderRadius: BorderRadius.circular(6),
             ),
-            child: TextFormField(
-              key: ValueKey('barcode-${state.formGeneration}'),
-              initialValue: state.labelData.barcode,
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                hintText: 'Barcode value',
-              ),
-              onChanged: controller.updateBarcode,
+            child: Row(
+              children: [
+                const Icon(Icons.qr_code_2, size: 16, color: Colors.black45),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Barcode: ${state.labelData.barcodeDisplay}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Padding(
+            padding: EdgeInsets.only(left: 4),
+            child: Text(
+              '(enter total to encode price)',
+              style: TextStyle(fontSize: 11, color: Colors.black45),
             ),
           ),
           const SizedBox(height: 22),
@@ -152,13 +172,15 @@ class PrintDetailsPanel extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 12),
               child: Column(
                 children: [
-                  LinearProgressIndicator(
-                    value: state.printTotal == 0
-                        ? null
-                        : state.printedCount / state.printTotal,
-                  ),
+                  // The printer produces all copies from a single
+                  // transmitted image via its own copy count, so progress
+                  // here is indeterminate rather than per-copy.
+                  const LinearProgressIndicator(),
                   const SizedBox(height: 6),
-                  Text('Printing ${state.printedCount} / ${state.printTotal}'),
+                  Text(
+                    'Sending ${state.printTotal} label'
+                    '${state.printTotal == 1 ? '' : 's'} to printer...',
+                  ),
                 ],
               ),
             ),

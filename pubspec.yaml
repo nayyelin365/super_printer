@@ -41,17 +41,17 @@ dependencies:
   # Local persistence for printer configuration
   shared_preferences: ^2.3.3
 
-  # Bluetooth (Classic + BLE) discovery/connection for Zebra printers
-  flutter_blue_plus: ^1.35.3
+  # Classic Bluetooth (SPP) discovery/connection for Zebra printers. Zebra
+  # desktop printers (ZD220 etc.) pair over classic Bluetooth, not BLE, so
+  # this talks to already-paired devices by MAC address rather than doing a
+  # GATT scan — matches how these printers are actually used in practice.
+  print_bluetooth_thermal: ^1.2.2
 
   # USB serial discovery/connection (Android). Note: `usb_serial` (the more
   # well-known package) is unmaintained and its Android build fails on
   # current Gradle/AGP (jcenter() was retired) — this package wraps the
   # actively-maintained mik3y/usb-serial-for-android and builds cleanly.
   flutter_serial_communication: ^0.2.8
-
-  # Runtime permission requests (Bluetooth/USB)
-  permission_handler: ^11.3.1
 
   # Code 128 barcode generation, rendered at print resolution
   barcode: ^2.2.9

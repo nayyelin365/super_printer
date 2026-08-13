@@ -10,8 +10,11 @@ class LabelData {
     this.totalAmount = 0,
     required this.packedAt,
     required this.useBy,
-    this.barcode = '029810801500',
   });
+
+  /// Fixed EAN-13 prefix; the total amount (in cents) is encoded into the
+  /// last 4 digits, e.g. prefix + "0800" for $8.00.
+  static const String barcodePrefix = '02981080';
 
   final String productName;
   final String productType;
@@ -20,7 +23,30 @@ class LabelData {
   final double totalAmount;
   final DateTime packedAt;
   final DateTime useBy;
-  final String barcode;
+
+  /// The 12-digit EAN-13 payload (before the check digit): [barcodePrefix]
+  /// with the total amount, in cents, zero-padded into the last 4 digits.
+  /// Amounts above $99.99 are clamped, since only 4 digits are available.
+  String get barcodeData {
+    final cents = (totalAmount * 100).round().clamp(0, 9999);
+    return '$barcodePrefix${cents.toString().padLeft(4, '0')}';
+  }
+
+  /// The full 13-digit EAN-13 number (payload + check digit), as printed
+  /// beneath the barcode.
+  String get barcodeDisplay => '$barcodeData${_ean13CheckDigit(barcodeData)}';
+
+  /// Standard EAN/UPC modulo-10 check digit.
+  static String _ean13CheckDigit(String data12) {
+    var sum = 0;
+    var fak = data12.length;
+    for (final c in data12.codeUnits) {
+      sum += fak.isEven ? (c - 0x30) : (c - 0x30) * 3;
+      fak--;
+    }
+    final rem = sum % 10;
+    return rem == 0 ? '0' : (10 - rem).toString();
+  }
 
   static LabelData initial() {
     final now = DateTime.now();
@@ -38,7 +64,6 @@ class LabelData {
     double? totalAmount,
     DateTime? packedAt,
     DateTime? useBy,
-    String? barcode,
   }) {
     return LabelData(
       productName: productName ?? this.productName,
@@ -48,7 +73,6 @@ class LabelData {
       totalAmount: totalAmount ?? this.totalAmount,
       packedAt: packedAt ?? this.packedAt,
       useBy: useBy ?? this.useBy,
-      barcode: barcode ?? this.barcode,
     );
   }
 }

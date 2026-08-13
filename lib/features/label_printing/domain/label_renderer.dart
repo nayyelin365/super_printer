@@ -21,9 +21,16 @@ class LabelRenderer {
   static const double designWidth = 900;
   static const double designHeight = 600;
 
+  // Info row (NET WT / PRICE/LB / TOTAL) top/bottom bounds — shared by the
+  // horizontal dividers above/below the row and the vertical dividers
+  // between its columns, so they always line up as one table.
+  static const _infoRowTop = 152.0;
+  static const _infoRowBottom = 238.0;
+
   static const _headerColor = Color(0xFF10202E);
-  static const _accentGray = Color(0xFF6B7280);
-  static const _dividerColor = Color(0xFFD8DCE1);
+  static const _accentGray = ui.Color.fromARGB(255, 50, 51, 53);
+  static const _dividerColor = ui.Color.fromARGB(255, 112, 110, 110);
+  static const _borderColor = ui.Color.fromARGB(255, 219, 219, 219);
 
   static final _dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
 
@@ -50,10 +57,29 @@ class LabelRenderer {
     _paintInfoRow(canvas, data);
     _paintDates(canvas, data);
     _paintBarcode(canvas, data);
+    _paintOuterBorder(canvas);
+  }
+
+  /// A table-style border around the whole label, drawn last so it sits
+  /// cleanly on top of the header/content beneath it.
+  void _paintOuterBorder(Canvas canvas) {
+    const strokeWidth = 3.0;
+    canvas.drawRect(
+      const Rect.fromLTWH(
+        strokeWidth / 2,
+        strokeWidth / 2,
+        designWidth - strokeWidth,
+        designHeight - strokeWidth,
+      ),
+      Paint()
+        ..color = _borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth,
+    );
   }
 
   void _paintHeader(Canvas canvas) {
-    const headerHeight = 64.0;
+    const headerHeight = 100.0;
     canvas.drawRect(
       const Rect.fromLTWH(0, 0, designWidth, headerHeight),
       Paint()..color = _headerColor,
@@ -64,7 +90,7 @@ class LabelRenderer {
       center: const Offset(designWidth / 2, headerHeight / 2),
       style: const TextStyle(
         color: Colors.white,
-        fontSize: 30,
+        fontSize: 38,
         fontWeight: FontWeight.w800,
         letterSpacing: 2,
       ),
@@ -78,17 +104,17 @@ class LabelRenderer {
     _drawText(
       canvas,
       name,
-      center: const Offset(designWidth / 2, 106),
+      center: const Offset(designWidth / 2, 126),
       style: const TextStyle(
         color: Colors.black,
-        fontSize: 30,
+        fontSize: 34,
         fontWeight: FontWeight.w700,
       ),
       maxWidth: designWidth - 60,
     );
     canvas.drawLine(
-      const Offset(40, 142),
-      const Offset(designWidth - 40, 142),
+      const Offset(40, _infoRowTop),
+      const Offset(designWidth - 40, _infoRowTop),
       Paint()
         ..color = _dividerColor
         ..strokeWidth = 2,
@@ -96,21 +122,21 @@ class LabelRenderer {
   }
 
   void _paintInfoRow(Canvas canvas, LabelData data) {
-    const top = 158.0;
+    const top = 180.0;
     const labelStyle = TextStyle(
-      color: _accentGray,
-      fontSize: 15,
+      color: ui.Color.fromARGB(255, 31, 31, 31),
+      fontSize: 22,
       fontWeight: FontWeight.w600,
       letterSpacing: 1,
     );
     const valueStyle = TextStyle(
       color: Colors.black,
-      fontSize: 24,
+      fontSize: 30,
       fontWeight: FontWeight.w700,
     );
     const totalValueStyle = TextStyle(
       color: Colors.black,
-      fontSize: 30,
+      fontSize: 32,
       fontWeight: FontWeight.w800,
     );
 
@@ -155,22 +181,40 @@ class LabelRenderer {
     }
 
     canvas.drawLine(
-      const Offset(40, 218),
-      const Offset(designWidth - 40, 218),
+      const Offset(40, _infoRowBottom),
+      const Offset(designWidth - 40, _infoRowBottom),
       Paint()
         ..color = _dividerColor
         ..strokeWidth = 2,
     );
+
+    // Vertical dividers between columns, spanning the full row height
+    // (matching the horizontal dividers above/below) so it reads as a table.
+    for (var i = 1; i < columns.length; i++) {
+      final x = 40 + columnWidth * i;
+      canvas.drawLine(
+        Offset(x, _infoRowTop),
+        Offset(x, _infoRowBottom),
+        Paint()
+          ..color = _dividerColor
+          ..strokeWidth = 2,
+      );
+    }
   }
 
   void _paintDates(Canvas canvas, LabelData data) {
-    const top = 244.0;
+    const top = 260.0;
     const labelStyle = TextStyle(
       color: Colors.black,
-      fontSize: 16,
+      fontSize: 26,
       fontWeight: FontWeight.w700,
     );
 
+    final useByText = 'USE BY: ${_dateFormat.format(data.useBy)}';
+    final useByWidth = _measureText(useByText, labelStyle);
+
+    // Space-between: PACKED pinned to the left margin, USE BY pinned to
+    // the right margin, with the gap between them flexing to fill the row.
     _drawText(
       canvas,
       'PACKED: ${_dateFormat.format(data.packedAt)}',
@@ -180,9 +224,9 @@ class LabelRenderer {
     );
     _drawText(
       canvas,
-      'USE BY: ${_dateFormat.format(data.useBy)}',
-      left: 40,
-      top: top + 26,
+      useByText,
+      left: designWidth - 40 - useByWidth,
+      top: top,
       style: labelStyle,
     );
   }
@@ -193,14 +237,15 @@ class LabelRenderer {
     const width = designWidth - 120;
     const height = 190.0;
 
-    final code = data.barcode.trim();
-    if (code.isEmpty) return;
+    // 12-digit payload; the package computes and appends the 13th
+    // (check) digit itself when rendering the bars.
+    final payload = data.barcodeData;
 
-    final barcode = Barcode.code128();
-    if (!barcode.isValid(code)) return;
+    final barcode = Barcode.ean13();
+    if (!barcode.isValid(payload)) return;
 
     for (final element in barcode.make(
-      code,
+      payload,
       width: width,
       height: height,
       drawText: false,
@@ -220,17 +265,20 @@ class LabelRenderer {
 
     _drawText(
       canvas,
-      code,
-      center: Offset(designWidth / 2, top + height + 18),
+      data.barcodeDisplay,
+      center: Offset(designWidth / 2, top + height + 20),
       style: const TextStyle(
         color: Colors.black,
-        fontSize: 16,
+        fontSize: 26,
+        fontWeight: FontWeight.w600,
         letterSpacing: 3,
       ),
     );
   }
 
-  void _drawText(
+  /// Paints [text] and returns its rendered width, so callers can lay out
+  /// adjacent text (e.g. a second label in the same row) after it.
+  double _drawText(
     Canvas canvas,
     String text, {
     Offset? center,
@@ -258,6 +306,18 @@ class LabelRenderer {
       origin = Offset(left ?? 0, top ?? 0);
     }
     painter.paint(canvas, origin);
+    return painter.width;
+  }
+
+  /// Measures [text] without painting it, so a caller can right-align (or
+  /// otherwise position) it before drawing.
+  double _measureText(String text, TextStyle style, {double? maxWidth}) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: ui.TextDirection.ltr,
+      maxLines: 1,
+    )..layout(maxWidth: maxWidth ?? designWidth);
+    return painter.width;
   }
 
   /// Renders the label at the exact printer resolution and returns a

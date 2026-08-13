@@ -94,7 +94,9 @@ class PrinterSessionController extends StateNotifier<PrinterSessionState> {
   /// Hands off an already-connected printer transport (from the settings
   /// discovery flow) and persists its configuration as the default.
   Future<void> adopt(PrinterConfig config, LabelPrinter connectedPrinter) async {
-    _printer?.dispose();
+    if (!identical(connectedPrinter, _printer)) {
+      _printer?.dispose();
+    }
     _printer = connectedPrinter;
     await _storage.save(config);
     state = state.copyWith(
@@ -102,6 +104,15 @@ class PrinterSessionController extends StateNotifier<PrinterSessionState> {
       status: PrinterConnectionStatus.connected,
       errorMessage: () => null,
     );
+  }
+
+  /// Persists edits to the saved printer's metadata (name, DPI, label size,
+  /// calibration, ...) without touching the live connection — used when the
+  /// user edits an already-connected (or currently offline) saved printer
+  /// rather than setting up a new device.
+  Future<void> updateConfig(PrinterConfig config) async {
+    await _storage.save(config);
+    state = state.copyWith(config: config, errorMessage: () => null);
   }
 
   Future<void> disconnect() async {

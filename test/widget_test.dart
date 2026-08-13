@@ -9,6 +9,10 @@ void main() {
   testWidgets('Home screen leads to the label print screen',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
       const ProviderScope(child: SuperPrinterApp()),
@@ -26,5 +30,16 @@ void main() {
     expect(find.text('LABEL PREVIEW'), findsOneWidget);
     expect(find.text('Print Details'), findsOneWidget);
     expect(find.widgetWithText(ElevatedButton, 'Print'), findsOneWidget);
+
+    // The edit button on the print screen opens printer settings.
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Printer Settings'), findsOneWidget);
+
+    // The close button dismisses it back to the print screen.
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pumpAndSettle();
+    expect(find.text('Printer Settings'), findsNothing);
+    expect(find.text('Print Details'), findsOneWidget);
   });
 }

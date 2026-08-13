@@ -103,13 +103,6 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     );
   }
 
-  void updateBarcode(String value) {
-    state = state.copyWith(
-      labelData: state.labelData.copyWith(barcode: value),
-      resultMessage: () => null,
-    );
-  }
-
   void updateQuantity(int value) {
     if (value < 1) return;
     state = state.copyWith(quantity: value, resultMessage: () => null);
@@ -150,10 +143,6 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
       state = state.copyWith(errorMessage: () => 'Enter a valid amount.');
       return;
     }
-    if (state.labelData.barcode.trim().isEmpty) {
-      state = state.copyWith(errorMessage: () => 'Enter a barcode value.');
-      return;
-    }
 
     final config = session.config;
     final dpi = config?.dpi ?? 300;
@@ -176,18 +165,19 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
         height: pixels.height,
       );
 
-      for (var i = 0; i < state.quantity; i++) {
-        await printer.printImage(
-          bitmap,
-          width: pixels.width,
-          height: pixels.height,
-          calibration: calibration ?? const PrinterCalibration(),
-        );
-        state = state.copyWith(printedCount: i + 1);
-      }
+      // One transmitted image, printed `quantity` times via the printer's
+      // own copy count (^PQ) — avoids re-sending the bitmap per copy.
+      await printer.printImage(
+        bitmap,
+        width: pixels.width,
+        height: pixels.height,
+        calibration: calibration ?? const PrinterCalibration(),
+        copies: state.quantity,
+      );
 
       state = state.copyWith(
         isPrinting: false,
+        printedCount: state.quantity,
         resultMessage: () =>
             '${state.quantity} label${state.quantity == 1 ? '' : 's'} printed successfully.',
       );

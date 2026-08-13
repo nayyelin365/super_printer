@@ -1,12 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Bluetooth printer discovery/connection (Android 12+) -->
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <!-- Classic Bluetooth (SPP) connection to already-paired printers
+         (Android 12+). No BLUETOOTH_SCAN/ACCESS_FINE_LOCATION needed since
+         discovery only lists already-bonded devices, not a live scan. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- Legacy Bluetooth permissions (Android 11 and below) -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
-    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <!-- USB printer discovery/connection -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
