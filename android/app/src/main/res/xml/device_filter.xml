@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Zebra Technologies (vendor id 0x0A5F / 2655) — covers ZD220,
+         ZD230, ZD420, ZD421 and other Zebra USB printers. -->
+    <usb-device vendor-id="2655" />
+</resources>
