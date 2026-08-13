@@ -190,6 +190,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.6.1"
+  flutter_serial_communication:
+    dependency: "direct main"
+    description:
+      name: flutter_serial_communication
+      sha256: "5ef6696dac2a2b31737a65981b2042f77f470131570d87fafbbfb55dce9be2b1"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.8"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -517,14 +525,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
-  usb_serial:
-    dependency: "direct main"
-    description:
-      name: usb_serial
-      sha256: a605a600e34e7f28d4e80851ca3999ef747e42e406138887b8a88b8c382a8b07
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.5.2"
   uuid:
     dependency: "direct main"
     description:

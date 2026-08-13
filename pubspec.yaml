@@ -44,8 +44,11 @@ dependencies:
   # Bluetooth (Classic + BLE) discovery/connection for Zebra printers
   flutter_blue_plus: ^1.35.3
 
-  # USB serial discovery/connection (Android)
-  usb_serial: ^0.5.2
+  # USB serial discovery/connection (Android). Note: `usb_serial` (the more
+  # well-known package) is unmaintained and its Android build fails on
+  # current Gradle/AGP (jcenter() was retired) — this package wraps the
+  # actively-maintained mik3y/usb-serial-for-android and builds cleanly.
+  flutter_serial_communication: ^0.2.8
 
   # Runtime permission requests (Bluetooth/USB)
   permission_handler: ^11.3.1
@@ -81,10 +84,9 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
-
+  assets:
+    - assets/images/
+ 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

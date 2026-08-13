@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:usb_serial/usb_serial.dart';
+import 'package:flutter_serial_communication/flutter_serial_communication.dart';
+import 'package:flutter_serial_communication/models/device_info.dart';
 
 import 'label_printer.dart';
 import 'models/connection_type.dart';
@@ -11,21 +12,22 @@ import 'models/printer_device.dart';
 import 'printer_exceptions.dart';
 import 'zpl_encoder.dart';
 
-/// USB transport for Zebra printers, built on `usb_serial`.
+/// USB transport for Zebra printers, built on `flutter_serial_communication`
+/// (a maintained wrapper around mik3y/usb-serial-for-android).
 ///
 /// Zebra desktop printers (ZD220/ZD230/ZD420/ZD421, etc.) enumerate as a
-/// USB-serial (CDC/vendor-class) device and accept raw ZPL over that port.
-/// `usb_serial` only supports Android; other desktop platforms would need a
-/// separate raw-USB or OS print-spooler adapter behind this same
-/// [LabelPrinter] interface, so callers never need to know the difference.
+/// USB-serial device and accept raw ZPL over that port. This plugin only
+/// supports Android; other desktop platforms would need a separate
+/// raw-USB or OS print-spooler adapter behind this same [LabelPrinter]
+/// interface, so callers never need to know the difference.
 class UsbLabelPrinter implements LabelPrinter {
   final ZplEncoder _encoder = const ZplEncoder();
-  UsbPort? _port;
-  UsbDevice? _device;
+  final FlutterSerialCommunication _serial = FlutterSerialCommunication();
+  DeviceInfo? _connectedDevice;
 
   /// The currently connected device, if any. Exposed so the printer
   /// settings UI can display the active USB identifiers.
-  UsbDevice? get connectedDevice => _device;
+  DeviceInfo? get connectedDevice => _connectedDevice;
 
   bool get _supportedPlatform => !kIsWeb && Platform.isAndroid;
 
@@ -39,16 +41,14 @@ class UsbLabelPrinter implements LabelPrinter {
     }
 
     try {
-      final devices = await UsbSerial.listDevices();
+      final devices = await _serial.getAvailableDevices();
       return devices
           .map((d) => PrinterDevice(
-                name: (d.productName?.isNotEmpty ?? false)
-                    ? d.productName!
-                    : d.deviceName,
-                address: '${d.vid ?? 0}:${d.pid ?? 0}',
+                name: d.productName.isNotEmpty ? d.productName : d.deviceName,
+                address: '${d.vendorId ?? 0}:${d.productId ?? 0}',
                 connectionType: PrinterConnectionType.usb,
-                usbVendorId: d.vid,
-                usbProductId: d.pid,
+                usbVendorId: d.vendorId,
+                usbProductId: d.productId,
                 usbDeviceName: d.deviceName,
               ))
           .toList();
@@ -80,55 +80,52 @@ class UsbLabelPrinter implements LabelPrinter {
 
     await disconnect();
 
-    final devices = await UsbSerial.listDevices();
+    final devices = await _serial.getAvailableDevices();
     final match = devices.firstWhere(
-      (d) => d.vid == printer.usbVendorId && d.pid == printer.usbProductId,
+      (d) =>
+          d.vendorId == printer.usbVendorId &&
+          d.productId == printer.usbProductId,
       orElse: () => throw const PrinterException(
         PrinterErrorCode.deviceNotFound,
         'The saved USB printer was not found. Check the cable and try again.',
       ),
     );
 
-    final port = await match.create();
-    if (port == null) {
+    bool connected;
+    try {
+      connected = await _serial.connect(match, 9600);
+    } catch (e) {
+      throw PrinterException(
+        PrinterErrorCode.connectionFailed,
+        'Could not open a connection to the USB printer.',
+        cause: e,
+      );
+    }
+
+    if (!connected) {
       throw const PrinterException(
         PrinterErrorCode.connectionFailed,
         'Could not open a connection to the USB printer.',
       );
     }
 
-    final opened = await port.open();
-    if (!opened) {
-      throw const PrinterException(
-        PrinterErrorCode.connectionFailed,
-        'Could not open a connection to the USB printer.',
-      );
-    }
-
-    await port.setPortParameters(
-      9600,
-      UsbPort.DATABITS_8,
-      UsbPort.STOPBITS_1,
-      UsbPort.PARITY_NONE,
-    );
-
-    _device = match;
-    _port = port;
+    _connectedDevice = match;
   }
 
   @override
   Future<void> disconnect() async {
-    try {
-      await _port?.close();
-    } catch (_) {
-      // Best-effort.
+    if (_connectedDevice != null) {
+      try {
+        await _serial.disconnect();
+      } catch (_) {
+        // Best-effort.
+      }
     }
-    _port = null;
-    _device = null;
+    _connectedDevice = null;
   }
 
   @override
-  Future<bool> isConnected() async => _port != null;
+  Future<bool> isConnected() async => _connectedDevice != null;
 
   @override
   Future<void> printImage(
@@ -137,8 +134,7 @@ class UsbLabelPrinter implements LabelPrinter {
     required int height,
     PrinterCalibration calibration = const PrinterCalibration(),
   }) async {
-    final port = _port;
-    if (port == null) {
+    if (_connectedDevice == null) {
       throw const PrinterException(
         PrinterErrorCode.notConnected,
         'Printer is not connected. Please connect a printer before printing.',
@@ -152,27 +148,30 @@ class UsbLabelPrinter implements LabelPrinter {
       calibration: calibration,
     );
 
-    try {
-      await port.write(Uint8List.fromList(utf8.encode(zpl)));
-    } catch (e) {
-      throw PrinterException(
-        PrinterErrorCode.communicationError,
-        'Failed to send label data to the printer.',
-        cause: e,
-      );
-    }
+    await _write(zpl);
   }
 
   Future<void> printRawZpl(String zpl) async {
-    final port = _port;
-    if (port == null) {
+    if (_connectedDevice == null) {
       throw const PrinterException(
         PrinterErrorCode.notConnected,
         'Printer is not connected. Please connect a printer before printing.',
       );
     }
+    await _write(zpl);
+  }
+
+  Future<void> _write(String zpl) async {
     try {
-      await port.write(Uint8List.fromList(utf8.encode(zpl)));
+      final sent = await _serial.write(Uint8List.fromList(utf8.encode(zpl)));
+      if (!sent) {
+        throw const PrinterException(
+          PrinterErrorCode.communicationError,
+          'Failed to send label data to the printer.',
+        );
+      }
+    } on PrinterException {
+      rethrow;
     } catch (e) {
       throw PrinterException(
         PrinterErrorCode.communicationError,
