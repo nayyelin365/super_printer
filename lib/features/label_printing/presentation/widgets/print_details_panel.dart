@@ -138,33 +138,47 @@ class PrintDetailsPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
 
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.qr_code_2, size: 16, color: Colors.black45),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Barcode: ${state.labelData.barcodeDisplay}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          const _SectionLabel('BARCODE'),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Show Barcode', style: TextStyle(fontSize: 13)),
+              ),
+              Switch(
+                value: state.labelData.showBarcode,
+                onChanged: controller.toggleShowBarcode,
+              ),
+            ],
+          ),
+          if (state.labelData.showBarcode) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.qr_code_2, size: 16, color: Colors.black45),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Barcode: ${state.labelData.barcodeDisplay}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          const Padding(
-            padding: EdgeInsets.only(left: 4),
-            child: Text(
-              '(enter total to encode price)',
-              style: TextStyle(fontSize: 11, color: Colors.black45),
+            const SizedBox(height: 4),
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Text(
+                '(enter total to encode price)',
+                style: TextStyle(fontSize: 11, color: Colors.black45),
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 22),
 
           if (state.isPrinting)

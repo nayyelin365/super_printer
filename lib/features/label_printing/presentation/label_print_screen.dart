@@ -14,18 +14,33 @@ class LabelPrintScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: AppTheme.border)),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.print_outlined),
-              SizedBox(width: 10),
-              Text('Menu Label Print', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            ],
+        Builder(
+          builder: (context) => Container(
+            padding: const EdgeInsets.fromLTRB(12, 10, 20, 10),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: AppTheme.border)),
+            ),
+            child: Row(
+              children: [
+                if (Navigator.of(context).canPop())
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Back to Food Selection',
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8, right: 8),
+                    child: Icon(Icons.print_outlined),
+                  ),
+                const SizedBox(width: 6),
+                const Text(
+                  'Menu Label Print',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
           ),
         ),
         Expanded(

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/theme/app_theme.dart';
-import '../../printer_workspace/presentation/printer_workspace_screen.dart';
+import '../../food_selection/presentation/food_selection_screen.dart';
 
 /// Landing page shown before the printer workspace — matches the FlavorHub
 /// marketing-style splash in the reference design: dark navy background,
@@ -110,7 +110,7 @@ class HomeScreen extends StatelessWidget {
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => const PrinterWorkspaceScreen(),
+                                builder: (_) => const FoodSelectionScreen(),
                               ),
                             );
                           },

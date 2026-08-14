@@ -10,6 +10,7 @@ class LabelData {
     this.totalAmount = 0,
     required this.packedAt,
     required this.useBy,
+    this.showBarcode = true,
   });
 
   /// Fixed EAN-13 prefix; the total amount (in cents) is encoded into the
@@ -23,6 +24,11 @@ class LabelData {
   final double totalAmount;
   final DateTime packedAt;
   final DateTime useBy;
+
+  /// Whether the barcode section renders at all. When false, the renderer
+  /// must not just hide the barcode in place — it reflows the remaining
+  /// content to fill the freed space (see [LabelRenderer]).
+  final bool showBarcode;
 
   /// The 12-digit EAN-13 payload (before the check digit): [barcodePrefix]
   /// with the total amount, in cents, zero-padded into the last 4 digits.
@@ -64,6 +70,7 @@ class LabelData {
     double? totalAmount,
     DateTime? packedAt,
     DateTime? useBy,
+    bool? showBarcode,
   }) {
     return LabelData(
       productName: productName ?? this.productName,
@@ -73,6 +80,7 @@ class LabelData {
       totalAmount: totalAmount ?? this.totalAmount,
       packedAt: packedAt ?? this.packedAt,
       useBy: useBy ?? this.useBy,
+      showBarcode: showBarcode ?? this.showBarcode,
     );
   }
 }

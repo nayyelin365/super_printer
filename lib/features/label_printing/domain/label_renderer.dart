@@ -15,22 +15,28 @@ import 'label_data.dart';
 /// "design space" of [designWidth] x [designHeight] (the 300 DPI pixel
 /// grid) and scaled with [Canvas.scale] to whatever concrete output size
 /// is requested — a small preview, or the full-resolution print target.
+///
+/// Sections below the header are laid out with a running vertical cursor
+/// rather than fixed y-coordinates, so optional sections (currently just
+/// the barcode) can be skipped entirely without leaving a gap: the whole
+/// content block is then centered in the space below the header, keeping
+/// the label visually balanced whether or not the barcode is shown.
 class LabelRenderer {
   const LabelRenderer();
 
   static const double designWidth = 900;
   static const double designHeight = 600;
 
-  // Info row (NET WT / PRICE/LB / TOTAL) top/bottom bounds — shared by the
-  // horizontal dividers above/below the row and the vertical dividers
-  // between its columns, so they always line up as one table.
-  static const _infoRowTop = 152.0;
-  static const _infoRowBottom = 238.0;
+  static const _headerHeight = 100.0;
+  static const _nameSectionHeight = 52.0;
+  static const _infoRowSectionHeight = 86.0;
+  static const _datesSectionHeight = 82.0;
+  static const _barcodeSectionHeight =
+      designHeight - _headerHeight - _nameSectionHeight - _infoRowSectionHeight - _datesSectionHeight;
 
-  static const _headerColor = Color(0xFF10202E);
-  static const _accentGray = ui.Color.fromARGB(255, 50, 51, 53);
-  static const _dividerColor = ui.Color.fromARGB(255, 112, 110, 110);
-  static const _borderColor = ui.Color.fromARGB(255, 219, 219, 219);
+  static const _accentGray = Color(0xFF6B7280);
+  static const _dividerColor = Color(0xFF706E6E);
+  static const _borderColor = Color(0xFFDBDBDB);
 
   static final _dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
 
@@ -46,17 +52,28 @@ class LabelRenderer {
   }
 
   void _paintAtDesignScale(Canvas canvas, LabelData data) {
-    final bg = Paint()..color = Colors.white;
     canvas.drawRect(
       const Rect.fromLTWH(0, 0, designWidth, designHeight),
-      bg,
+      Paint()..color = Colors.white,
     );
 
     _paintHeader(canvas);
-    _paintProductName(canvas, data);
-    _paintInfoRow(canvas, data);
-    _paintDates(canvas, data);
-    _paintBarcode(canvas, data);
+
+    final contentHeight = _nameSectionHeight +
+        _infoRowSectionHeight +
+        _datesSectionHeight +
+        (data.showBarcode ? _barcodeSectionHeight : 0);
+    final availableHeight = designHeight - _headerHeight;
+    final extraSpace = availableHeight - contentHeight;
+    var cursor = _headerHeight + (extraSpace > 0 ? extraSpace / 2 : 0);
+
+    cursor = _paintProductName(canvas, data, cursor);
+    cursor = _paintInfoRow(canvas, data, cursor);
+    cursor = _paintDates(canvas, data, cursor);
+    if (data.showBarcode) {
+      _paintBarcode(canvas, data, cursor);
+    }
+
     _paintOuterBorder(canvas);
   }
 
@@ -79,15 +96,10 @@ class LabelRenderer {
   }
 
   void _paintHeader(Canvas canvas) {
-    const headerHeight = 100.0;
-   // canvas.drawRect(
-    //   const Rect.fromLTWH(0, 0, designWidth, headerHeight),
-    //   Paint()..color = _headerColor,
-    // );
     _drawText(
       canvas,
       'FLAVORHUB',
-      center: const Offset(designWidth / 2, headerHeight / 2),
+      center: const Offset(designWidth / 2, _headerHeight / 2),
       style: const TextStyle(
         color: Colors.black,
         fontSize: 38,
@@ -97,14 +109,15 @@ class LabelRenderer {
     );
   }
 
-  void _paintProductName(Canvas canvas, LabelData data) {
+  /// Returns the cursor for the next section (this section's bottom edge).
+  double _paintProductName(Canvas canvas, LabelData data, double top) {
     final name = data.productName.trim().isEmpty
         ? 'UNNAMED PRODUCT'
         : data.productName.toUpperCase();
     _drawText(
       canvas,
       name,
-      center: const Offset(designWidth / 2, 126),
+      center: Offset(designWidth / 2, top + 26),
       style: const TextStyle(
         color: Colors.black,
         fontSize: 34,
@@ -112,19 +125,22 @@ class LabelRenderer {
       ),
       maxWidth: designWidth - 60,
     );
+
+    final dividerY = top + _nameSectionHeight;
     canvas.drawLine(
-      const Offset(40, _infoRowTop),
-      const Offset(designWidth - 40, _infoRowTop),
+      Offset(40, dividerY),
+      Offset(designWidth - 40, dividerY),
       Paint()
         ..color = _dividerColor
         ..strokeWidth = 2,
     );
+
+    return dividerY;
   }
 
-  void _paintInfoRow(Canvas canvas, LabelData data) {
-    const top = 180.0;
+  double _paintInfoRow(Canvas canvas, LabelData data, double top) {
     const labelStyle = TextStyle(
-      color: ui.Color.fromARGB(255, 31, 31, 31),
+      color: _accentGray,
       fontSize: 22,
       fontWeight: FontWeight.w600,
       letterSpacing: 1,
@@ -162,6 +178,10 @@ class LabelRenderer {
       ),
     ];
 
+    final labelY = top + 28;
+    final valueY = labelY + 32;
+    final bottom = top + _infoRowSectionHeight;
+
     final columnWidth = (designWidth - 80) / 3;
     for (var i = 0; i < columns.length; i++) {
       final centerX = 40 + columnWidth * i + columnWidth / 2;
@@ -169,20 +189,20 @@ class LabelRenderer {
       _drawText(
         canvas,
         col.label,
-        center: Offset(centerX, top),
+        center: Offset(centerX, labelY),
         style: labelStyle,
       );
       _drawText(
         canvas,
         col.value,
-        center: Offset(centerX, top + 32),
+        center: Offset(centerX, valueY),
         style: col.style,
       );
     }
 
     canvas.drawLine(
-      const Offset(40, _infoRowBottom),
-      const Offset(designWidth - 40, _infoRowBottom),
+      Offset(40, bottom),
+      Offset(designWidth - 40, bottom),
       Paint()
         ..color = _dividerColor
         ..strokeWidth = 2,
@@ -193,17 +213,19 @@ class LabelRenderer {
     for (var i = 1; i < columns.length; i++) {
       final x = 40 + columnWidth * i;
       canvas.drawLine(
-        Offset(x, _infoRowTop),
-        Offset(x, _infoRowBottom),
+        Offset(x, top),
+        Offset(x, bottom),
         Paint()
           ..color = _dividerColor
           ..strokeWidth = 2,
       );
     }
+
+    return bottom;
   }
 
-  void _paintDates(Canvas canvas, LabelData data) {
-    const top = 270.0;
+  double _paintDates(Canvas canvas, LabelData data, double top) {
+    final textTop = top + 22;
     const labelStyle = TextStyle(
       color: Colors.black,
       fontSize: 26,
@@ -213,29 +235,30 @@ class LabelRenderer {
     final useByText = 'BEST BY: ${_dateFormat.format(data.useBy)}';
     final useByWidth = _measureText(useByText, labelStyle);
 
-    // Space-between: PACKED pinned to the left margin, USE BY pinned to
+    // Space-between: PACKED pinned to the left margin, BEST BY pinned to
     // the right margin, with the gap between them flexing to fill the row.
     _drawText(
       canvas,
       'PACKED: ${_dateFormat.format(data.packedAt)}',
       left: 40,
-      top: top,
+      top: textTop,
       style: labelStyle,
     );
     _drawText(
       canvas,
       useByText,
       left: designWidth - 40 - useByWidth,
-      top: top,
+      top: textTop,
       style: labelStyle,
     );
+
+    return top + _datesSectionHeight;
   }
 
-  void _paintBarcode(Canvas canvas, LabelData data) {
+  void _paintBarcode(Canvas canvas, LabelData data, double top) {
     const left = 60.0;
-    const top = 340.0;
-    const width = designWidth - 120;
     const height = 150.0;
+    const width = designWidth - 120;
 
     // 12-digit payload; the package computes and appends the 13th
     // (check) digit itself when rendering the bars.

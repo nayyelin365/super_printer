@@ -103,6 +103,13 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     );
   }
 
+  void toggleShowBarcode(bool value) {
+    state = state.copyWith(
+      labelData: state.labelData.copyWith(showBarcode: value),
+      resultMessage: () => null,
+    );
+  }
+
   void updateQuantity(int value) {
     if (value < 1) return;
     state = state.copyWith(quantity: value, resultMessage: () => null);
@@ -121,6 +128,16 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
 
   void reset() {
     state = LabelPrintState(formGeneration: state.formGeneration + 1);
+  }
+
+  /// Starts a fresh label for a food picked on the Food Selection screen —
+  /// same as [reset], but pre-fills the product name. This never touches
+  /// the food catalog itself, only the label being edited.
+  void startNewLabel(String foodName) {
+    state = LabelPrintState(
+      labelData: LabelData.initial().copyWith(productName: foodName),
+      formGeneration: state.formGeneration + 1,
+    );
   }
 
   Future<void> print() async {
