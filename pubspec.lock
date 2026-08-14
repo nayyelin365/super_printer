@@ -89,6 +89,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.9"
+  drago_usb_printer:
+    dependency: "direct main"
+    description:
+      name: drago_usb_printer
+      sha256: "6fb00522aadf04236d0082dbb494b011ef539a734fc196f902f8c7a6947b6cb5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.4"
   fake_async:
     dependency: transitive
     description:
@@ -142,14 +150,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.6.1"
-  flutter_serial_communication:
-    dependency: "direct main"
-    description:
-      name: flutter_serial_communication
-      sha256: "5ef6696dac2a2b31737a65981b2042f77f470131570d87fafbbfb55dce9be2b1"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.2.8"
   flutter_test:
     dependency: "direct dev"
     description: flutter

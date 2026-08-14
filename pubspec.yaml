@@ -47,11 +47,11 @@ dependencies:
   # GATT scan — matches how these printers are actually used in practice.
   print_bluetooth_thermal: ^1.2.2
 
-  # USB serial discovery/connection (Android). Note: `usb_serial` (the more
-  # well-known package) is unmaintained and its Android build fails on
-  # current Gradle/AGP (jcenter() was retired) — this package wraps the
-  # actively-maintained mik3y/usb-serial-for-android and builds cleanly.
-  flutter_serial_communication: ^0.2.8
+  # USB discovery/connection for Zebra printers (Android). Talks to the
+  # printer as a USB device by vendor/product id directly (not a generic
+  # serial port with a baud rate), which is what actually works reliably
+  # with Zebra USB printers in practice.
+  drago_usb_printer: ^0.1.4
 
   # Code 128 barcode generation, rendered at print resolution
   barcode: ^2.2.9

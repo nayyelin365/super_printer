@@ -80,16 +80,16 @@ class LabelRenderer {
 
   void _paintHeader(Canvas canvas) {
     const headerHeight = 100.0;
-    canvas.drawRect(
-      const Rect.fromLTWH(0, 0, designWidth, headerHeight),
-      Paint()..color = _headerColor,
-    );
+   // canvas.drawRect(
+    //   const Rect.fromLTWH(0, 0, designWidth, headerHeight),
+    //   Paint()..color = _headerColor,
+    // );
     _drawText(
       canvas,
       'FLAVORHUB',
       center: const Offset(designWidth / 2, headerHeight / 2),
       style: const TextStyle(
-        color: Colors.white,
+        color: Colors.black,
         fontSize: 38,
         fontWeight: FontWeight.w800,
         letterSpacing: 2,
@@ -203,14 +203,14 @@ class LabelRenderer {
   }
 
   void _paintDates(Canvas canvas, LabelData data) {
-    const top = 260.0;
+    const top = 270.0;
     const labelStyle = TextStyle(
       color: Colors.black,
       fontSize: 26,
       fontWeight: FontWeight.w700,
     );
 
-    final useByText = 'USE BY: ${_dateFormat.format(data.useBy)}';
+    final useByText = 'BEST BY: ${_dateFormat.format(data.useBy)}';
     final useByWidth = _measureText(useByText, labelStyle);
 
     // Space-between: PACKED pinned to the left margin, USE BY pinned to
@@ -233,9 +233,9 @@ class LabelRenderer {
 
   void _paintBarcode(Canvas canvas, LabelData data) {
     const left = 60.0;
-    const top = 320.0;
+    const top = 340.0;
     const width = designWidth - 120;
-    const height = 190.0;
+    const height = 150.0;
 
     // 12-digit payload; the package computes and appends the 13th
     // (check) digit itself when rendering the bars.
