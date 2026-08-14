@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/theme/app_theme.dart';
+import '../domain/label_template.dart';
 import 'label_print_controller.dart';
+import 'widgets/food_rotation_fields_editor.dart';
 import 'widgets/label_preview.dart';
+import 'widgets/poke_bowl_fields_editor.dart';
 import 'widgets/print_details_panel.dart';
 
 class LabelPrintScreen extends StatelessWidget {
@@ -27,7 +30,7 @@ class LabelPrintScreen extends StatelessWidget {
                   IconButton(
                     onPressed: () => Navigator.of(context).maybePop(),
                     icon: const Icon(Icons.arrow_back),
-                    tooltip: 'Back to Food Selection',
+                    tooltip: 'Back',
                   )
                 else
                   const Padding(
@@ -86,7 +89,6 @@ class _PreviewColumn extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(labelPrintControllerProvider);
-    final controller = ref.read(labelPrintControllerProvider.notifier);
     final data = state.labelData;
 
     return Container(
@@ -124,36 +126,10 @@ class _PreviewColumn extends ConsumerWidget {
             style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            key: ValueKey('name-${state.formGeneration}'),
-            initialValue: data.productName,
-            decoration: const InputDecoration(labelText: 'Product Name'),
-            onChanged: controller.updateProductName,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  key: ValueKey('netwt-${state.formGeneration}'),
-                  initialValue: data.netWeight?.toString() ?? '',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Net Weight (lb)'),
-                  onChanged: controller.updateNetWeight,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  key: ValueKey('price-${state.formGeneration}'),
-                  initialValue: data.pricePerLb?.toString() ?? '',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Price / lb'),
-                  onChanged: controller.updatePricePerLb,
-                ),
-              ),
-            ],
-          ),
+          switch (state.template) {
+            LabelTemplateType.pokeBowlBurrito => const PokeBowlFieldsEditor(),
+            LabelTemplateType.foodRotation => const FoodRotationFieldsEditor(),
+          },
         ],
       ),
     );

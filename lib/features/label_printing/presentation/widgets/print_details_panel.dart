@@ -8,6 +8,9 @@ import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/status_badge.dart';
 import '../../../../shared/widgets/app_sidebar.dart';
 import '../../../printer_workspace/presentation/app_section_controller.dart';
+import '../../../template_selection/presentation/template_selection_screen.dart';
+import '../../domain/label_data.dart';
+import '../../domain/label_template.dart';
 import '../label_print_controller.dart';
 
 class PrintDetailsPanel extends ConsumerWidget {
@@ -36,6 +39,24 @@ class PrintDetailsPanel extends ConsumerWidget {
             style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 20),
+
+          const _SectionLabel('TEMPLATE'),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  LabelTemplateCatalog.byType(state.template).name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TextButton(
+                onPressed: () => _changeTemplate(context),
+                child: const Text('Change'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
 
           const _SectionLabel('PRINTER'),
           Row(
@@ -77,15 +98,17 @@ class PrintDetailsPanel extends ConsumerWidget {
           Text(session.config?.labelSize.displayName ?? '3 × 2"'),
           const SizedBox(height: 18),
 
-          const _SectionLabel('TOTAL AMOUNT'),
-          TextFormField(
-            key: ValueKey('amount-${state.formGeneration}'),
-            initialValue: state.amountText,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(hintText: 'Enter Amount', prefixText: '\$ '),
-            onChanged: controller.updateAmount,
-          ),
-          const SizedBox(height: 18),
+          if (state.labelData is PokeBowlLabelData) ...[
+            const _SectionLabel('TOTAL AMOUNT'),
+            TextFormField(
+              key: ValueKey('amount-${state.formGeneration}'),
+              initialValue: state.amountText,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(hintText: 'Enter Amount', prefixText: '\$ '),
+              onChanged: controller.updateAmount,
+            ),
+            const SizedBox(height: 18),
+          ],
 
           const _SectionLabel('QUANTITY'),
           Row(
@@ -114,7 +137,11 @@ class PrintDetailsPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
 
-          const _SectionLabel('USE BY — DAYS FROM PACKED'),
+          _SectionLabel(
+            state.template == LabelTemplateType.foodRotation
+                ? 'USE BY — DAYS FROM PREP'
+                : 'USE BY — DAYS FROM PACKED',
+          ),
           Row(
             children: [2, 3, 4, 5]
                 .map(
@@ -138,48 +165,50 @@ class PrintDetailsPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
 
-          const _SectionLabel('BARCODE'),
-          Row(
-            children: [
-              const Expanded(
-                child: Text('Show Barcode', style: TextStyle(fontSize: 13)),
+          if (state.labelData case final PokeBowlLabelData pokeBowl) ...[
+            const _SectionLabel('BARCODE'),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Show Barcode', style: TextStyle(fontSize: 13)),
+                ),
+                Switch(
+                  value: pokeBowl.showBarcode,
+                  onChanged: controller.toggleShowBarcode,
+                ),
+              ],
+            ),
+            if (pokeBowl.showBarcode) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.qr_code_2, size: 16, color: Colors.black45),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Barcode: ${pokeBowl.barcodeDisplay}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Switch(
-                value: state.labelData.showBarcode,
-                onChanged: controller.toggleShowBarcode,
+              const SizedBox(height: 4),
+              const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Text(
+                  '(enter total to encode price)',
+                  style: TextStyle(fontSize: 11, color: Colors.black45),
+                ),
               ),
             ],
-          ),
-          if (state.labelData.showBarcode) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.qr_code_2, size: 16, color: Colors.black45),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Barcode: ${state.labelData.barcodeDisplay}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Padding(
-              padding: EdgeInsets.only(left: 4),
-              child: Text(
-                '(enter total to encode price)',
-                style: TextStyle(fontSize: 11, color: Colors.black45),
-              ),
-            ),
+            const SizedBox(height: 22),
           ],
-          const SizedBox(height: 22),
 
           if (state.isPrinting)
             Padding(
@@ -232,6 +261,17 @@ class PrintDetailsPanel extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Returns to Template Selection, clearing Food Selection/print-page
+  /// history so re-picking a template always starts from a clean stack —
+  /// [LabelPrintController.startNewLabel] (run when a template is next
+  /// confirmed) already guarantees no field values leak between templates.
+  void _changeTemplate(BuildContext context) {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const TemplateSelectionScreen()),
     );
   }
 }

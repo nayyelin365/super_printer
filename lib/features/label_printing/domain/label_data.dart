@@ -1,8 +1,24 @@
-/// Structured data for a single label. Consumed by [LabelRenderer] to
-/// produce both the live preview and the final print bitmap, so the two
-/// can never visually drift apart.
-class LabelData {
-  const LabelData({
+import 'label_template.dart';
+
+/// Base type for a template's label data. Each template owns its own
+/// concrete subclass with only the fields it needs — see
+/// [PokeBowlLabelData] and `FoodRotationLabelData`. Nothing generic is
+/// forced onto every template beyond knowing which one it is.
+abstract class LabelData {
+  const LabelData();
+
+  LabelTemplateType get templateType;
+
+  /// Every template has a use-by date, computed from whatever its own
+  /// "start" date is (packed date, prep date/time, ...) — shared UI like
+  /// the Use By selector reads this without knowing which template it is.
+  DateTime get useBy;
+}
+
+/// Label data for the "Custom Poke Bowl / Burrito" template (weighed deli
+/// items with a price-encoded barcode).
+class PokeBowlLabelData extends LabelData {
+  const PokeBowlLabelData({
     this.productName = 'CUSTOM POKE BOWL / BURRITO',
     this.productType = '',
     this.netWeight,
@@ -23,12 +39,16 @@ class LabelData {
   final double? pricePerLb;
   final double totalAmount;
   final DateTime packedAt;
+  @override
   final DateTime useBy;
 
   /// Whether the barcode section renders at all. When false, the renderer
   /// must not just hide the barcode in place — it reflows the remaining
-  /// content to fill the freed space (see [LabelRenderer]).
+  /// content to fill the freed space (see [PokeBowlLabelRenderer]).
   final bool showBarcode;
+
+  @override
+  LabelTemplateType get templateType => LabelTemplateType.pokeBowlBurrito;
 
   /// The 12-digit EAN-13 payload (before the check digit): [barcodePrefix]
   /// with the total amount, in cents, zero-padded into the last 4 digits.
@@ -54,15 +74,15 @@ class LabelData {
     return rem == 0 ? '0' : (10 - rem).toString();
   }
 
-  static LabelData initial() {
+  static PokeBowlLabelData initial() {
     final now = DateTime.now();
-    return LabelData(
+    return PokeBowlLabelData(
       packedAt: now,
       useBy: now.add(const Duration(days: 3)),
     );
   }
 
-  LabelData copyWith({
+  PokeBowlLabelData copyWith({
     String? productName,
     String? productType,
     double? Function()? netWeight,
@@ -72,7 +92,7 @@ class LabelData {
     DateTime? useBy,
     bool? showBarcode,
   }) {
-    return LabelData(
+    return PokeBowlLabelData(
       productName: productName ?? this.productName,
       productType: productType ?? this.productType,
       netWeight: netWeight != null ? netWeight() : this.netWeight,

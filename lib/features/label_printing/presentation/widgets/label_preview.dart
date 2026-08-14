@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/label_data.dart';
-import '../../domain/label_renderer.dart';
+import '../../domain/label_template_renderer.dart';
 
-/// Live preview of the label, built from the same [LabelRenderer] used to
-/// generate the print bitmap — never a static image.
+/// Live preview of the label, built from the same renderer (looked up via
+/// [LabelTemplateRenderers]) used to generate the print bitmap — never a
+/// static image, and never a template-specific widget: adding a template
+/// only means adding it to the registry.
 class LabelPreview extends StatelessWidget {
   const LabelPreview({super.key, required this.data});
 
@@ -13,7 +15,7 @@ class LabelPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: LabelRenderer.designWidth / LabelRenderer.designHeight,
+      aspectRatio: LabelCanvas.designWidth / LabelCanvas.designHeight,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -38,11 +40,10 @@ class _LabelPainter extends CustomPainter {
   _LabelPainter(this.data);
 
   final LabelData data;
-  static const _renderer = LabelRenderer();
 
   @override
   void paint(Canvas canvas, Size size) {
-    _renderer.paint(canvas, size, data);
+    LabelTemplateRenderers.forData(data).paint(canvas, size, data);
   }
 
   @override

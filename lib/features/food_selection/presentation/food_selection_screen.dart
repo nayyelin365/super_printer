@@ -4,13 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../label_printing/presentation/label_print_controller.dart';
 import '../../printer_workspace/presentation/printer_workspace_screen.dart';
+import '../../template_selection/presentation/template_selection_controller.dart';
 import 'food_selection_controller.dart';
 import 'widgets/food_card.dart';
 
-/// First step of the printing flow: pick which food/menu item the label is
-/// for. Selecting one starts a fresh label (see
-/// [LabelPrintController.startNewLabel]) pre-filled with that name and
-/// opens the printer workspace — the food catalog itself is never modified.
+/// Step in the printing flow for templates that need a food/menu item
+/// picked first (see [LabelTemplate.requiresFoodSelection]). Selecting one
+/// starts a fresh label (see [LabelPrintController.startNewLabel]) for the
+/// active template, pre-filled with that name, and opens the printer
+/// workspace.
+///
+/// The catalog itself is editable here (add via the + button, remove from
+/// a card) and persisted through [FoodCatalogController] — selecting a food
+/// for a label never modifies the catalog, only these explicit actions do.
 class FoodSelectionScreen extends ConsumerWidget {
   const FoodSelectionScreen({super.key});
 
@@ -25,7 +31,7 @@ class FoodSelectionScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 20, 16),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
               decoration: const BoxDecoration(
                 color: Colors.white,
                 border: Border(bottom: BorderSide(color: AppTheme.border)),
@@ -38,9 +44,16 @@ class FoodSelectionScreen extends ConsumerWidget {
                     tooltip: 'Back',
                   ),
                   const SizedBox(width: 4),
-                  const Text(
-                    'Select Food',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  const Expanded(
+                    child: Text(
+                      'Select Food',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => _showAddFoodDialog(context, ref),
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Add food',
                   ),
                 ],
               ),
@@ -84,6 +97,7 @@ class FoodSelectionScreen extends ConsumerWidget {
                         return FoodCard(
                           name: food,
                           onSelect: () => _selectFood(context, ref, food),
+                          onRemove: () => _confirmRemoveFood(context, ref, food),
                         );
                       },
                     ),
@@ -95,9 +109,96 @@ class FoodSelectionScreen extends ConsumerWidget {
   }
 
   void _selectFood(BuildContext context, WidgetRef ref, String food) {
-    ref.read(labelPrintControllerProvider.notifier).startNewLabel(food);
+    final template = ref.read(selectedLabelTemplateProvider);
+    ref
+        .read(labelPrintControllerProvider.notifier)
+        .startNewLabel(template, foodName: food);
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const PrinterWorkspaceScreen()),
     );
+  }
+
+  Future<void> _showAddFoodDialog(BuildContext context, WidgetRef ref) async {
+    final formKey = GlobalKey<FormState>();
+    // Tracked via onChanged rather than a TextEditingController — the
+    // dialog's own exit transition can still be rebuilding briefly after
+    // showDialog() resolves, so a controller disposed immediately after
+    // would be used-after-dispose.
+    var enteredName = '';
+
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Add Food'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(hintText: 'Food name'),
+              onChanged: (value) => enteredName = value,
+              validator: (value) =>
+                  (value == null || value.trim().isEmpty) ? 'Enter a food name' : null,
+              onFieldSubmitted: (value) {
+                if (formKey.currentState!.validate()) {
+                  Navigator.of(dialogContext).pop(value.trim());
+                }
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.of(dialogContext).pop(enteredName.trim());
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (name == null || name.isEmpty || !context.mounted) return;
+
+    final added = await ref.read(foodCatalogProvider.notifier).addFood(name);
+    if (!added && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"$name" is already in the list.')),
+      );
+    }
+  }
+
+  Future<void> _confirmRemoveFood(BuildContext context, WidgetRef ref, String food) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Remove Food'),
+          content: Text('Remove "$food" from the food list? This can\'t be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Remove'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await ref.read(foodCatalogProvider.notifier).removeFood(food);
+    }
   }
 }

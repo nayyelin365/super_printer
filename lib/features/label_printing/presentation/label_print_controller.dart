@@ -5,8 +5,10 @@ import '../../../core/printer/models/label_size.dart';
 import '../../../core/printer/models/printer_calibration.dart';
 import '../../../core/printer/printer_exceptions.dart';
 import '../../../core/printer/printer_session_controller.dart';
+import '../domain/food_rotation_label_data.dart';
 import '../domain/label_data.dart';
-import '../domain/label_renderer.dart';
+import '../domain/label_template.dart';
+import '../domain/label_template_renderer.dart';
 
 class LabelPrintState {
   LabelPrintState({
@@ -20,7 +22,7 @@ class LabelPrintState {
     this.resultMessage,
     this.errorMessage,
     this.formGeneration = 0,
-  }) : labelData = labelData ?? LabelData.initial();
+  }) : labelData = labelData ?? PokeBowlLabelData.initial();
 
   final LabelData labelData;
   final int quantity;
@@ -33,10 +35,15 @@ class LabelPrintState {
   final String? resultMessage;
   final String? errorMessage;
 
-  /// Bumped only by [LabelPrintController.reset]. Text fields key off this
-  /// (instead of their own value) so external resets force the on-screen
-  /// text to refresh, while normal typing never resets cursor/focus.
+  /// Bumped only by [LabelPrintController.reset]/[LabelPrintController.startNewLabel].
+  /// Text fields key off this (instead of their own value) so external
+  /// resets force the on-screen text to refresh, while normal typing never
+  /// resets cursor/focus.
   final int formGeneration;
+
+  /// Which template [labelData] belongs to — derived from the data itself
+  /// so the two can never drift out of sync.
+  LabelTemplateType get template => labelData.templateType;
 
   LabelPrintState copyWith({
     LabelData? labelData,
@@ -69,75 +76,140 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
   LabelPrintController(this._ref) : super(LabelPrintState());
 
   final Ref _ref;
-  final LabelRenderer _renderer = const LabelRenderer();
+
+  // ---- Poke Bowl / Burrito fields --------------------------------------
 
   void updateProductName(String value) {
+    final data = state.labelData;
+    if (data is! PokeBowlLabelData) return;
     state = state.copyWith(
-      labelData: state.labelData.copyWith(productName: value),
+      labelData: data.copyWith(productName: value),
       resultMessage: () => null,
     );
   }
 
   void updateNetWeight(String value) {
+    final data = state.labelData;
+    if (data is! PokeBowlLabelData) return;
     final parsed = double.tryParse(value);
     state = state.copyWith(
-      labelData: state.labelData.copyWith(netWeight: () => parsed),
+      labelData: data.copyWith(netWeight: () => parsed),
       resultMessage: () => null,
     );
   }
 
   void updatePricePerLb(String value) {
+    final data = state.labelData;
+    if (data is! PokeBowlLabelData) return;
     final parsed = double.tryParse(value);
     state = state.copyWith(
-      labelData: state.labelData.copyWith(pricePerLb: () => parsed),
+      labelData: data.copyWith(pricePerLb: () => parsed),
       resultMessage: () => null,
     );
   }
 
   void updateAmount(String value) {
+    final data = state.labelData;
+    if (data is! PokeBowlLabelData) return;
     final parsed = double.tryParse(value) ?? 0;
     state = state.copyWith(
       amountText: value,
-      labelData: state.labelData.copyWith(totalAmount: parsed),
+      labelData: data.copyWith(totalAmount: parsed),
       resultMessage: () => null,
     );
   }
 
   void toggleShowBarcode(bool value) {
+    final data = state.labelData;
+    if (data is! PokeBowlLabelData) return;
     state = state.copyWith(
-      labelData: state.labelData.copyWith(showBarcode: value),
+      labelData: data.copyWith(showBarcode: value),
       resultMessage: () => null,
     );
   }
+
+  // ---- Food Rotation fields ---------------------------------------------
+
+  void updateFoodName(String value) {
+    final data = state.labelData;
+    if (data is! FoodRotationLabelData) return;
+    state = state.copyWith(
+      labelData: data.copyWith(foodName: value),
+      resultMessage: () => null,
+    );
+  }
+
+  void updatePrepDateTime(DateTime value) {
+    final data = state.labelData;
+    if (data is! FoodRotationLabelData) return;
+    state = state.copyWith(
+      labelData: data.copyWith(
+        prepDateTime: value,
+        useBy: value.add(Duration(days: state.useByDays)),
+      ),
+      resultMessage: () => null,
+    );
+  }
+
+  void updateEmployee(String value) {
+    final data = state.labelData;
+    if (data is! FoodRotationLabelData) return;
+    state = state.copyWith(
+      labelData: data.copyWith(employee: value),
+      resultMessage: () => null,
+    );
+  }
+
+  // ---- Shared fields ------------------------------------------------------
 
   void updateQuantity(int value) {
     if (value < 1) return;
     state = state.copyWith(quantity: value, resultMessage: () => null);
   }
 
+  /// Days from the template's "start" date (packed date for Poke Bowl, prep
+  /// date/time for Food Rotation) used to compute Use By.
   void updateUseByDays(int days) {
-    final packedAt = state.labelData.packedAt;
+    final data = state.labelData;
+    final LabelData updated = switch (data) {
+      PokeBowlLabelData d => d.copyWith(useBy: d.packedAt.add(Duration(days: days))),
+      FoodRotationLabelData d => d.copyWith(useBy: d.prepDateTime.add(Duration(days: days))),
+      _ => data,
+    };
     state = state.copyWith(
       useByDays: days,
-      labelData: state.labelData.copyWith(
-        useBy: packedAt.add(Duration(days: days)),
-      ),
+      labelData: updated,
       resultMessage: () => null,
     );
   }
 
   void reset() {
-    state = LabelPrintState(formGeneration: state.formGeneration + 1);
-  }
-
-  /// Starts a fresh label for a food picked on the Food Selection screen —
-  /// same as [reset], but pre-fills the product name. This never touches
-  /// the food catalog itself, only the label being edited.
-  void startNewLabel(String foodName) {
     state = LabelPrintState(
-      labelData: LabelData.initial().copyWith(productName: foodName),
+      labelData: _freshData(state.template, foodName: null),
       formGeneration: state.formGeneration + 1,
     );
+  }
+
+  /// Starts a fresh label for the given [templateType] — same as [reset],
+  /// but for switching templates (or pre-filling a food name picked on the
+  /// Food Selection screen). Never touches the food catalog or any other
+  /// template's data.
+  void startNewLabel(LabelTemplateType templateType, {String? foodName}) {
+    state = LabelPrintState(
+      labelData: _freshData(templateType, foodName: foodName),
+      formGeneration: state.formGeneration + 1,
+    );
+  }
+
+  LabelData _freshData(LabelTemplateType type, {String? foodName}) {
+    return switch (type) {
+      LabelTemplateType.pokeBowlBurrito => foodName == null
+          ? PokeBowlLabelData.initial()
+          : PokeBowlLabelData.initial().copyWith(productName: foodName),
+      LabelTemplateType.foodRotation => FoodRotationLabelData.initial().copyWith(
+          foodName: foodName ?? '',
+        ),
+    };
   }
 
   Future<void> print() async {
@@ -156,7 +228,8 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
       state = state.copyWith(errorMessage: () => 'Enter a valid quantity.');
       return;
     }
-    if (state.labelData.totalAmount < 0) {
+    final labelData = state.labelData;
+    if (labelData is PokeBowlLabelData && labelData.totalAmount < 0) {
       state = state.copyWith(errorMessage: () => 'Enter a valid amount.');
       return;
     }
@@ -176,7 +249,8 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     );
 
     try {
-      final bitmap = await _renderer.renderToGrayscale(
+      final renderer = LabelTemplateRenderers.forData(state.labelData);
+      final bitmap = await renderer.renderToGrayscale(
         data: state.labelData,
         width: pixels.width,
         height: pixels.height,

@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:barcode/barcode.dart';
@@ -6,26 +5,20 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'label_data.dart';
+import 'label_template_renderer.dart';
 
-/// Draws a 3 x 2 inch label from [LabelData].
-///
-/// This is the single source of truth for label layout: the live preview
-/// widget and the final print bitmap both call [paint], so what the user
-/// sees is exactly what gets printed. Layout is authored in a fixed
-/// "design space" of [designWidth] x [designHeight] (the 300 DPI pixel
-/// grid) and scaled with [Canvas.scale] to whatever concrete output size
-/// is requested — a small preview, or the full-resolution print target.
+/// Renderer for the "Custom Poke Bowl / Burrito" template.
 ///
 /// Sections below the header are laid out with a running vertical cursor
 /// rather than fixed y-coordinates, so optional sections (currently just
 /// the barcode) can be skipped entirely without leaving a gap: the whole
 /// content block is then centered in the space below the header, keeping
 /// the label visually balanced whether or not the barcode is shown.
-class LabelRenderer {
-  const LabelRenderer();
+class PokeBowlLabelRenderer extends LabelTemplateRenderer {
+  const PokeBowlLabelRenderer();
 
-  static const double designWidth = 900;
-  static const double designHeight = 600;
+  static const double designWidth = LabelCanvas.designWidth;
+  static const double designHeight = LabelCanvas.designHeight;
 
   static const _headerHeight = 100.0;
   static const _nameSectionHeight = 52.0;
@@ -40,18 +33,19 @@ class LabelRenderer {
 
   static final _dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
 
-  /// Paints the label into [canvas], scaled to fill [outputSize].
+  @override
   void paint(Canvas canvas, Size outputSize, LabelData data) {
+    final pokeBowl = data as PokeBowlLabelData;
     canvas.save();
     canvas.scale(
       outputSize.width / designWidth,
       outputSize.height / designHeight,
     );
-    _paintAtDesignScale(canvas, data);
+    _paintAtDesignScale(canvas, pokeBowl);
     canvas.restore();
   }
 
-  void _paintAtDesignScale(Canvas canvas, LabelData data) {
+  void _paintAtDesignScale(Canvas canvas, PokeBowlLabelData data) {
     canvas.drawRect(
       const Rect.fromLTWH(0, 0, designWidth, designHeight),
       Paint()..color = Colors.white,
@@ -110,7 +104,7 @@ class LabelRenderer {
   }
 
   /// Returns the cursor for the next section (this section's bottom edge).
-  double _paintProductName(Canvas canvas, LabelData data, double top) {
+  double _paintProductName(Canvas canvas, PokeBowlLabelData data, double top) {
     final name = data.productName.trim().isEmpty
         ? 'UNNAMED PRODUCT'
         : data.productName.toUpperCase();
@@ -138,7 +132,7 @@ class LabelRenderer {
     return dividerY;
   }
 
-  double _paintInfoRow(Canvas canvas, LabelData data, double top) {
+  double _paintInfoRow(Canvas canvas, PokeBowlLabelData data, double top) {
     const labelStyle = TextStyle(
       color: _accentGray,
       fontSize: 22,
@@ -224,7 +218,7 @@ class LabelRenderer {
     return bottom;
   }
 
-  double _paintDates(Canvas canvas, LabelData data, double top) {
+  double _paintDates(Canvas canvas, PokeBowlLabelData data, double top) {
     final textTop = top + 22;
     const labelStyle = TextStyle(
       color: Colors.black,
@@ -255,7 +249,7 @@ class LabelRenderer {
     return top + _datesSectionHeight;
   }
 
-  void _paintBarcode(Canvas canvas, LabelData data, double top) {
+  void _paintBarcode(Canvas canvas, PokeBowlLabelData data, double top) {
     const left = 60.0;
     const height = 150.0;
     const width = designWidth - 120;
@@ -341,43 +335,5 @@ class LabelRenderer {
       maxLines: 1,
     )..layout(maxWidth: maxWidth ?? designWidth);
     return painter.width;
-  }
-
-  /// Renders the label at the exact printer resolution and returns a
-  /// row-major grayscale buffer (one byte per pixel, 0 = black, 255 =
-  /// white), ready for [ZplEncoder.buildLabelZpl]. This is generated
-  /// independently of the on-screen preview widget so the print output is
-  /// never an upscaled screenshot.
-  Future<Uint8List> renderToGrayscale({
-    required LabelData data,
-    required int width,
-    required int height,
-  }) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(
-      recorder,
-      Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
-    );
-    paint(canvas, Size(width.toDouble(), height.toDouble()), data);
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(width, height);
-    final byteData = await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
-    );
-    image.dispose();
-    if (byteData == null) {
-      throw StateError('Failed to render label bitmap.');
-    }
-
-    final rgba = byteData.buffer.asUint8List();
-    final gray = Uint8List(width * height);
-    for (var i = 0; i < gray.length; i++) {
-      final offset = i * 4;
-      final r = rgba[offset];
-      final g = rgba[offset + 1];
-      final b = rgba[offset + 2];
-      gray[i] = (0.299 * r + 0.587 * g + 0.114 * b).round().clamp(0, 255);
-    }
-    return gray;
   }
 }
