@@ -18,6 +18,7 @@ class LabelPrintState {
     this.quantity = 1,
     this.useByAmount = 24,
     this.amountText = '',
+    this.amountGeneration = 0,
     this.isPrinting = false,
     this.printedCount = 0,
     this.printTotal = 0,
@@ -29,10 +30,16 @@ class LabelPrintState {
   final LabelData labelData;
   final int quantity;
 
-  /// Raw number the user typed for Use By: interpreted as hours if <= 24,
-  /// or as days if > 24 — see [LabelPrintController.useByDuration].
+  /// Number of hours from the template's "start" date/time the user typed
+  /// for Use By — see [LabelPrintController.useByDuration].
   final int useByAmount;
   final String amountText;
+
+  /// Bumped whenever [amountText] is set programmatically (base/extra price
+  /// buttons, clear) rather than typed — the Total Amount field keys off
+  /// this (see [formGeneration]) so those updates refresh the on-screen
+  /// text without disturbing cursor/focus while the seller is typing.
+  final int amountGeneration;
 
   final bool isPrinting;
   final int printedCount;
@@ -64,6 +71,7 @@ class LabelPrintState {
     int? quantity,
     int? useByAmount,
     String? amountText,
+    int? amountGeneration,
     bool? isPrinting,
     int? printedCount,
     int? printTotal,
@@ -76,6 +84,7 @@ class LabelPrintState {
       quantity: quantity ?? this.quantity,
       useByAmount: useByAmount ?? this.useByAmount,
       amountText: amountText ?? this.amountText,
+      amountGeneration: amountGeneration ?? this.amountGeneration,
       isPrinting: isPrinting ?? this.isPrinting,
       printedCount: printedCount ?? this.printedCount,
       printTotal: printTotal ?? this.printTotal,
@@ -131,6 +140,48 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
       labelData: data.copyWith(totalAmount: parsed),
       resultMessage: () => null,
     );
+  }
+
+  /// Sets Total Amount to [amount] outright — for the base-price quick
+  /// picks, of which only one applies at a time.
+  void selectBasePrice(double amount) {
+    final data = state.labelData;
+    if (data is! PokeBowlLabelData) return;
+    state = state.copyWith(
+      amountText: _formatAmount(amount),
+      amountGeneration: state.amountGeneration + 1,
+      labelData: data.copyWith(totalAmount: amount),
+      resultMessage: () => null,
+    );
+  }
+
+  /// Adds [amount] on top of the current Total Amount — for the extra-price
+  /// quick picks, which can be tapped any number of times.
+  void addExtraPrice(double amount) {
+    final data = state.labelData;
+    if (data is! PokeBowlLabelData) return;
+    final total = data.totalAmount + amount;
+    state = state.copyWith(
+      amountText: _formatAmount(total),
+      amountGeneration: state.amountGeneration + 1,
+      labelData: data.copyWith(totalAmount: total),
+      resultMessage: () => null,
+    );
+  }
+
+  void clearAmount() {
+    final data = state.labelData;
+    if (data is! PokeBowlLabelData) return;
+    state = state.copyWith(
+      amountText: '',
+      amountGeneration: state.amountGeneration + 1,
+      labelData: data.copyWith(totalAmount: 0),
+      resultMessage: () => null,
+    );
+  }
+
+  static String _formatAmount(double amount) {
+    return amount % 1 == 0 ? amount.toStringAsFixed(0) : amount.toStringAsFixed(2);
   }
 
   void toggleShowBarcode(bool value) {
@@ -229,16 +280,13 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     state = state.copyWith(quantity: value, resultMessage: () => null);
   }
 
-  /// A typed number 1-24 means "hours from now"; anything above 24 means
-  /// "days from now" — e.g. 12 -> 12 hours, 48 or 124 -> 48 or 124 days.
-  static Duration useByDuration(int amount) {
-    return amount <= 24 ? Duration(hours: amount) : Duration(days: amount);
-  }
+  /// The typed number is always hours from the template's "start" date —
+  /// e.g. 12 -> 12 hours, 48 -> 48 hours, 124 -> 124 hours.
+  static Duration useByDuration(int amount) => Duration(hours: amount);
 
   /// Offset from the template's "start" date (packed date for Poke Bowl,
   /// prep date/time for Food Rotation, packed time for custom templates)
-  /// used to compute Use By — see [useByDuration] for how [amount] is
-  /// interpreted.
+  /// used to compute Use By — see [useByDuration].
   void updateUseByAmount(int amount) {
     if (amount < 0) return;
     final duration = useByDuration(amount);

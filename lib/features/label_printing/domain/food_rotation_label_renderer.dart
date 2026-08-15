@@ -81,10 +81,11 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
       center: const Offset(designWidth / 2, 110),
       style: const TextStyle(
         color: Colors.black,
-        fontSize: 42,
+        fontSize: 45,
         fontWeight: FontWeight.w800,
       ),
       maxWidth: designWidth - 60,
+      maxLines: 2,
     );
   }
 
@@ -114,7 +115,7 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
       top: top,
       style: const TextStyle(
         color: Colors.black,
-        fontSize: 26,
+        fontSize: 30,
         fontWeight: FontWeight.w700,
       ),
     );
@@ -134,7 +135,7 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
       center: boxRect.center,
       style: const TextStyle(
         color: Colors.white,
-        fontSize: 30,
+        fontSize: 42,
         fontWeight: FontWeight.w800,
       ),
     );
@@ -149,12 +150,10 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
 
     final employee = data.employee.trim().isEmpty ? '-' : data.employee.trim();
     final text = 'EMPLOYEE: $employee';
-    final width = _measureText(text, style);
     _drawText(
       canvas,
       text,
-      left: designWidth - 40 - width,
-      top: 460,
+      center: const Offset(designWidth / 2, 460),
       style: style,
     );
   }
@@ -167,13 +166,14 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     double? top,
     required TextStyle style,
     double? maxWidth,
+    int maxLines = 1,
   }) {
     final painter = TextPainter(
       text: TextSpan(text: text, style: style),
       textDirection: ui.TextDirection.ltr,
       textAlign: TextAlign.center,
       ellipsis: maxWidth != null ? '…' : null,
-      maxLines: 1,
+      maxLines: maxLines,
     );
     painter.layout(maxWidth: maxWidth ?? designWidth);
 
@@ -187,15 +187,6 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
       origin = Offset(left ?? 0, top ?? 0);
     }
     painter.paint(canvas, origin);
-    return painter.width;
-  }
-
-  double _measureText(String text, TextStyle style, {double? maxWidth}) {
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: ui.TextDirection.ltr,
-      maxLines: 1,
-    )..layout(maxWidth: maxWidth ?? designWidth);
     return painter.width;
   }
 }

@@ -43,6 +43,8 @@ void main() {
 
     // Poke Bowl-only sections are present.
     expect(find.textContaining('Barcode:'), findsOneWidget);
+    await tester.ensureVisible(find.byType(Switch));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     expect(find.textContaining('Barcode:'), findsNothing);

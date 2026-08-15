@@ -11,6 +11,7 @@ import '../../../printer_workspace/presentation/app_section_controller.dart';
 import '../../../template_selection/presentation/template_selection_screen.dart';
 import '../../domain/label_data.dart';
 import '../../domain/label_template.dart';
+import '../../domain/poke_bowl_pricing.dart';
 import '../label_print_controller.dart';
 
 class PrintDetailsPanel extends ConsumerWidget {
@@ -34,77 +35,77 @@ class PrintDetailsPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Print Details',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Print Details',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              SizedBox(
+                width: 120,
+                child: ElevatedButton(
+                  onPressed: state.isPrinting ? null : controller.print,
+                  child: Text(state.isPrinting ? 'Printing...' : 'Print'),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
 
-          const _SectionLabel('TEMPLATE'),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  state.fullTemplate.name,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
+          if (state.labelData case final PokeBowlLabelData pokeBowl) ...[
+            const _SectionLabel('BASE PRICE'),
+            for (var i = 0; i < basePriceOptions.length; i += 2)
+              Padding(
+                padding: EdgeInsets.only(bottom: i + 2 < basePriceOptions.length ? 2 : 0),
+                child: Row(
+                  children: [
+                    Expanded(child: _BasePriceButton(basePriceOptions[i], pokeBowl, controller)),
+                    Expanded(
+                      child: i + 1 < basePriceOptions.length
+                          ? _BasePriceButton(basePriceOptions[i + 1], pokeBowl, controller)
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
                 ),
               ),
-              TextButton(
-                onPressed: () => _changeTemplate(context),
-                child: const Text('Change'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
+            const SizedBox(height: 14),
 
-          const _SectionLabel('PRINTER'),
-          Row(
-            children: [
-              const Icon(Icons.print_outlined, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  session.config?.name ?? 'No printer configured',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              StatusBadge(status: session.status),
-              IconButton(
-                onPressed: () =>
-                    ref.read(appSectionProvider.notifier).state = AppSection.settings,
-                icon: const Icon(Icons.edit_outlined, size: 16),
-                tooltip: session.config == null ? 'Set up printer' : 'Edit printer settings',
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                padding: EdgeInsets.zero,
-              ),
-            ],
-          ),
-          if (session.status != PrinterConnectionStatus.connected)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: TextButton(
-                onPressed: session.config == null
-                    ? null
-                    : () => ref.read(printerSessionProvider.notifier).reconnect(),
-                child: const Text('Reconnect'),
-              ),
+            const _SectionLabel('EXTRA'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final extra in extraPriceOptions)
+                  SizedBox(
+                    height: 32,
+                    child: OutlinedButton(
+                      onPressed: () => controller.addExtraPrice(extra),
+                      child: Text('+ \$${extra.toStringAsFixed(2)}'),
+                    ),
+                  ),
+              ],
             ),
-          const SizedBox(height: 18),
+            const SizedBox(height: 14),
 
-          const _SectionLabel('LABEL SIZE'),
-          Text(session.config?.labelSize.displayName ?? '3 × 2"'),
-          const SizedBox(height: 18),
-
-          if (state.labelData is PokeBowlLabelData) ...[
             const _SectionLabel('TOTAL AMOUNT'),
             TextFormField(
-              key: ValueKey('amount-${state.formGeneration}'),
+              key: ValueKey('amount-${state.formGeneration}-${state.amountGeneration}'),
               initialValue: state.amountText,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(hintText: 'Enter Amount', prefixText: '\$ '),
+              decoration: InputDecoration(
+                hintText: 'Enter Amount',
+                prefixText: '\$ ',
+                suffixIcon: IconButton(
+                  onPressed: controller.clearAmount,
+                  icon: const Icon(Icons.clear, size: 18),
+                  tooltip: 'Clear amount',
+                ),
+              ),
               onChanged: controller.updateAmount,
             ),
             const SizedBox(height: 18),
@@ -149,7 +150,7 @@ class PrintDetailsPanel extends ConsumerWidget {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 hintText: 'e.g. 12',
-                suffixText: '1–24 = hours, 25+ = days',
+                suffixText: 'hours',
                 suffixStyle: TextStyle(fontSize: 11, color: Colors.black45),
               ),
               onChanged: (text) {
@@ -245,14 +246,67 @@ class PrintDetailsPanel extends ConsumerWidget {
               ),
             ),
 
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: state.isPrinting ? null : controller.print,
-              child: Text(state.isPrinting ? 'Printing...' : 'Print'),
-            ),
+          const Divider(height: 1),
+          const SizedBox(height: 18),
+
+          const _SectionLabel('TEMPLATE'),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  state.fullTemplate.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TextButton(
+                onPressed: () => _changeTemplate(context),
+                child: const Text('Change'),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 18),
+
+          const _SectionLabel('PRINTER'),
+          Row(
+            children: [
+              const Icon(Icons.print_outlined, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  session.config?.name ?? 'No printer configured',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              StatusBadge(status: session.status),
+              IconButton(
+                onPressed: () =>
+                    ref.read(appSectionProvider.notifier).state = AppSection.settings,
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                tooltip: session.config == null ? 'Set up printer' : 'Edit printer settings',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+          if (session.status != PrinterConnectionStatus.connected)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: TextButton(
+                onPressed: session.config == null
+                    ? null
+                    : () => ref.read(printerSessionProvider.notifier).reconnect(),
+                child: const Text('Reconnect'),
+              ),
+            ),
+          const SizedBox(height: 18),
+
+          const _SectionLabel('LABEL SIZE'),
+          Text(session.config?.labelSize.displayName ?? '3 × 2"'),
+          const SizedBox(height: 18),
+
           Center(
             child: TextButton(
               onPressed: state.isPrinting ? null : controller.reset,
@@ -276,6 +330,27 @@ class PrintDetailsPanel extends ConsumerWidget {
   }
 }
 
+class _BasePriceButton extends StatelessWidget {
+  const _BasePriceButton(this.option, this.pokeBowl, this.controller);
+
+  final BasePriceOption option;
+  final PokeBowlLabelData pokeBowl;
+  final LabelPrintController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = pokeBowl.totalAmount == option.amount;
+    return ChoiceChip(
+      label: Text(
+        '${option.label} \$${option.amount.toStringAsFixed(2)}',
+        overflow: TextOverflow.ellipsis,
+      ),
+      selected: selected,
+      onSelected: (_) => controller.selectBasePrice(option.amount),
+    );
+  }
+}
+
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text);
   final String text;
@@ -283,7 +358,7 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 2),
       child: Text(
         text,
         style: const TextStyle(

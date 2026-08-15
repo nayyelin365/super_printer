@@ -261,7 +261,10 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
   void _paintBarcode(Canvas canvas, PokeBowlLabelData data, double top) {
     const width = _barcodeWidth;
     const height = _barcodeHeight;
-    const left = designWidth - 40 - width;
+    // Right-aligned, but pulled in further than the usual 40px margin so
+    // it doesn't sit flush against the edge.
+    const rightMargin = 90.0;
+    const left = designWidth - rightMargin - width;
     const fontHeight = 20.0;
 
     // 12-digit payload; the package computes and appends the 13th
