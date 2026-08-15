@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../domain/label_template.dart';
 import 'label_print_controller.dart';
+import 'widgets/custom_template_fields_editor.dart';
 import 'widgets/food_rotation_fields_editor.dart';
 import 'widgets/label_preview.dart';
 import 'widgets/poke_bowl_fields_editor.dart';
@@ -129,6 +130,7 @@ class _PreviewColumn extends ConsumerWidget {
           switch (state.template) {
             LabelTemplateType.pokeBowlBurrito => const PokeBowlFieldsEditor(),
             LabelTemplateType.foodRotation => const FoodRotationFieldsEditor(),
+            LabelTemplateType.custom => const CustomTemplateFieldsEditor(),
           },
         ],
       ),

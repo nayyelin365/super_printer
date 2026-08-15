@@ -47,6 +47,13 @@ dependencies:
   # GATT scan — matches how these printers are actually used in practice.
   print_bluetooth_thermal: ^1.2.2
 
+  # Requests the Android 12+ BLUETOOTH_CONNECT runtime permission ourselves.
+  # print_bluetooth_thermal only *checks* whether it's granted — its own
+  # request-permission call is dead code in the plugin — so without this,
+  # the OS permission dialog never appears and the app just reports "denied"
+  # forever on first use.
+  permission_handler: ^11.3.1
+
   # USB discovery/connection for Zebra printers (Android). Talks to the
   # printer as a USB device by vendor/product id directly (not a generic
   # serial port with a baud rate), which is what actually works reliably

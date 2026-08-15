@@ -17,15 +17,18 @@ class PrinterSettingsScreen extends ConsumerWidget {
     final state = ref.watch(printerSetupControllerProvider);
     final controller = ref.read(printerSetupControllerProvider.notifier);
 
+    void close() => ref.read(appSectionProvider.notifier).state = AppSection.print;
+
     ref.listen(printerSetupControllerProvider, (previous, next) {
       if (next.saved && previous?.saved != true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Printer configuration saved.')),
         );
+        if (next.connectState == DeviceConnectState.connected) {
+          close();
+        }
       }
     });
-
-    void close() => ref.read(appSectionProvider.notifier).state = AppSection.print;
 
     return GestureDetector(
       onTap: close,

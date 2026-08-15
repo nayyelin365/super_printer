@@ -45,7 +45,7 @@ class PrintDetailsPanel extends ConsumerWidget {
             children: [
               Expanded(
                 child: Text(
-                  LabelTemplateCatalog.byType(state.template).name,
+                  state.fullTemplate.name,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -137,33 +137,33 @@ class PrintDetailsPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
 
-          _SectionLabel(
-            state.template == LabelTemplateType.foodRotation
-                ? 'USE BY — DAYS FROM PREP'
-                : 'USE BY — DAYS FROM PACKED',
-          ),
-          Row(
-            children: [2, 3, 4, 5]
-                .map(
-                  (d) => Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _UseByButton(
-                        days: d,
-                        selected: state.useByDays == d,
-                        onTap: () => controller.updateUseByDays(d),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Use By: ${dateFormat.format(state.labelData.useBy)}',
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
-          ),
-          const SizedBox(height: 18),
+          if (state.labelData.useBy case final useBy?) ...[
+            _SectionLabel(
+              state.template == LabelTemplateType.foodRotation
+                  ? 'USE BY — FROM PREP'
+                  : 'USE BY — FROM PACKED',
+            ),
+            TextFormField(
+              key: ValueKey('usebyamount-${state.formGeneration}'),
+              initialValue: state.useByAmount.toString(),
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                hintText: 'e.g. 12',
+                suffixText: '1–24 = hours, 25+ = days',
+                suffixStyle: TextStyle(fontSize: 11, color: Colors.black45),
+              ),
+              onChanged: (text) {
+                final parsed = int.tryParse(text);
+                if (parsed != null) controller.updateUseByAmount(parsed);
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Use By: ${dateFormat.format(useBy)}',
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+            const SizedBox(height: 18),
+          ],
 
           if (state.labelData case final PokeBowlLabelData pokeBowl) ...[
             const _SectionLabel('BARCODE'),
@@ -312,38 +312,6 @@ class _StepButton extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(border: Border.all(color: AppTheme.border)),
         child: Icon(icon, size: 16, color: onTap == null ? Colors.black26 : Colors.black87),
-      ),
-    );
-  }
-}
-
-class _UseByButton extends StatelessWidget {
-  const _UseByButton({required this.days, required this.selected, required this.onTap});
-  final int days;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? AppTheme.navyDark : Colors.white,
-          border: Border.all(color: selected ? AppTheme.navyDark : AppTheme.border),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          '+${days}d',
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.black87,
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-          ),
-        ),
       ),
     );
   }

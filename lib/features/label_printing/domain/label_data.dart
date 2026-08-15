@@ -9,10 +9,11 @@ abstract class LabelData {
 
   LabelTemplateType get templateType;
 
-  /// Every template has a use-by date, computed from whatever its own
-  /// "start" date is (packed date, prep date/time, ...) — shared UI like
-  /// the Use By selector reads this without knowing which template it is.
-  DateTime get useBy;
+  /// A use-by date, computed from whatever this template's own "start"
+  /// date is (packed date, prep date/time, ...), if it has the concept at
+  /// all — shared UI like the Use By selector reads this without knowing
+  /// which template it is, and hides itself when null.
+  DateTime? get useBy => null;
 }
 
 /// Label data for the "Custom Poke Bowl / Burrito" template (weighed deli
@@ -78,7 +79,7 @@ class PokeBowlLabelData extends LabelData {
     final now = DateTime.now();
     return PokeBowlLabelData(
       packedAt: now,
-      useBy: now.add(const Duration(days: 3)),
+      useBy: now.add(const Duration(hours: 24)),
     );
   }
 

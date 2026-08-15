@@ -5,7 +5,9 @@ import '../../../core/printer/models/label_size.dart';
 import '../../../core/printer/models/printer_calibration.dart';
 import '../../../core/printer/printer_exceptions.dart';
 import '../../../core/printer/printer_session_controller.dart';
+import '../domain/custom_label_data.dart';
 import '../domain/food_rotation_label_data.dart';
+import '../domain/label_component.dart';
 import '../domain/label_data.dart';
 import '../domain/label_template.dart';
 import '../domain/label_template_renderer.dart';
@@ -14,7 +16,7 @@ class LabelPrintState {
   LabelPrintState({
     LabelData? labelData,
     this.quantity = 1,
-    this.useByDays = 3,
+    this.useByAmount = 24,
     this.amountText = '',
     this.isPrinting = false,
     this.printedCount = 0,
@@ -26,7 +28,10 @@ class LabelPrintState {
 
   final LabelData labelData;
   final int quantity;
-  final int useByDays;
+
+  /// Raw number the user typed for Use By: interpreted as hours if <= 24,
+  /// or as days if > 24 — see [LabelPrintController.useByDuration].
+  final int useByAmount;
   final String amountText;
 
   final bool isPrinting;
@@ -45,10 +50,19 @@ class LabelPrintState {
   /// so the two can never drift out of sync.
   LabelTemplateType get template => labelData.templateType;
 
+  /// The full [LabelTemplate] behind [labelData]: for custom templates
+  /// that's carried on the data itself; for built-ins it's looked up from
+  /// the fixed catalog.
+  LabelTemplate get fullTemplate {
+    final data = labelData;
+    if (data is CustomLabelData) return data.template;
+    return LabelTemplateCatalog.builtIns.firstWhere((t) => t.type == data.templateType);
+  }
+
   LabelPrintState copyWith({
     LabelData? labelData,
     int? quantity,
-    int? useByDays,
+    int? useByAmount,
     String? amountText,
     bool? isPrinting,
     int? printedCount,
@@ -60,7 +74,7 @@ class LabelPrintState {
     return LabelPrintState(
       labelData: labelData ?? this.labelData,
       quantity: quantity ?? this.quantity,
-      useByDays: useByDays ?? this.useByDays,
+      useByAmount: useByAmount ?? this.useByAmount,
       amountText: amountText ?? this.amountText,
       isPrinting: isPrinting ?? this.isPrinting,
       printedCount: printedCount ?? this.printedCount,
@@ -145,7 +159,7 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     state = state.copyWith(
       labelData: data.copyWith(
         prepDateTime: value,
-        useBy: value.add(Duration(days: state.useByDays)),
+        useBy: value.add(useByDuration(state.useByAmount)),
       ),
       resultMessage: () => null,
     );
@@ -160,6 +174,54 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     );
   }
 
+  void updatePh(String value) {
+    final data = state.labelData;
+    if (data is! FoodRotationLabelData) return;
+    state = state.copyWith(
+      labelData: data.copyWith(ph: value),
+      resultMessage: () => null,
+    );
+  }
+
+  void toggleShowPh(bool value) {
+    final data = state.labelData;
+    if (data is! FoodRotationLabelData) return;
+    state = state.copyWith(
+      labelData: data.copyWith(showPh: value),
+      resultMessage: () => null,
+    );
+  }
+
+  // ---- Custom template fields --------------------------------------------
+
+  /// Updates a dynamic field's runtime value for a custom template — e.g.
+  /// a `text`/`barcode` component's fieldKey. Date/time-bound fields go
+  /// through [updateCustomPackedAt]/[updateUseByAmount] instead, so the Use
+  /// By input stays consistent with the built-in templates.
+  void updateCustomFieldValue(String fieldKey, String value) {
+    final data = state.labelData;
+    if (data is! CustomLabelData) return;
+    state = state.copyWith(
+      labelData: data.withFieldValue(fieldKey, value),
+      resultMessage: () => null,
+    );
+  }
+
+  void updateCustomPackedAt(DateTime value) {
+    final data = state.labelData;
+    if (data is! CustomLabelData) return;
+    final hasUseBy = data.useBy != null;
+    state = state.copyWith(
+      labelData: hasUseBy
+          ? data.copyWith(
+              packedAt: value,
+              useByAt: () => value.add(useByDuration(state.useByAmount)),
+            )
+          : data.copyWith(packedAt: value),
+      resultMessage: () => null,
+    );
+  }
+
   // ---- Shared fields ------------------------------------------------------
 
   void updateQuantity(int value) {
@@ -167,17 +229,29 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     state = state.copyWith(quantity: value, resultMessage: () => null);
   }
 
-  /// Days from the template's "start" date (packed date for Poke Bowl, prep
-  /// date/time for Food Rotation) used to compute Use By.
-  void updateUseByDays(int days) {
+  /// A typed number 1-24 means "hours from now"; anything above 24 means
+  /// "days from now" — e.g. 12 -> 12 hours, 48 or 124 -> 48 or 124 days.
+  static Duration useByDuration(int amount) {
+    return amount <= 24 ? Duration(hours: amount) : Duration(days: amount);
+  }
+
+  /// Offset from the template's "start" date (packed date for Poke Bowl,
+  /// prep date/time for Food Rotation, packed time for custom templates)
+  /// used to compute Use By — see [useByDuration] for how [amount] is
+  /// interpreted.
+  void updateUseByAmount(int amount) {
+    if (amount < 0) return;
+    final duration = useByDuration(amount);
     final data = state.labelData;
     final LabelData updated = switch (data) {
-      PokeBowlLabelData d => d.copyWith(useBy: d.packedAt.add(Duration(days: days))),
-      FoodRotationLabelData d => d.copyWith(useBy: d.prepDateTime.add(Duration(days: days))),
+      PokeBowlLabelData d => d.copyWith(useBy: d.packedAt.add(duration)),
+      FoodRotationLabelData d => d.copyWith(useBy: d.prepDateTime.add(duration)),
+      CustomLabelData d when d.useBy != null =>
+        d.copyWith(useByAt: () => d.packedAt.add(duration)),
       _ => data,
     };
     state = state.copyWith(
-      useByDays: days,
+      useByAmount: amount,
       labelData: updated,
       resultMessage: () => null,
     );
@@ -185,30 +259,36 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
 
   void reset() {
     state = LabelPrintState(
-      labelData: _freshData(state.template, foodName: null),
+      labelData: _freshData(state.fullTemplate, foodName: null),
       formGeneration: state.formGeneration + 1,
     );
   }
 
-  /// Starts a fresh label for the given [templateType] — same as [reset],
-  /// but for switching templates (or pre-filling a food name picked on the
-  /// Food Selection screen). Never touches the food catalog or any other
-  /// template's data.
-  void startNewLabel(LabelTemplateType templateType, {String? foodName}) {
+  /// Starts a fresh label for [template] — same as [reset], but for
+  /// switching templates (or pre-filling a food name picked on the Food
+  /// Selection screen). Never touches the food catalog, the template
+  /// catalog, or any other template's data.
+  void startNewLabel(LabelTemplate template, {String? foodName}) {
     state = LabelPrintState(
-      labelData: _freshData(templateType, foodName: foodName),
+      labelData: _freshData(template, foodName: foodName),
       formGeneration: state.formGeneration + 1,
     );
   }
 
-  LabelData _freshData(LabelTemplateType type, {String? foodName}) {
-    return switch (type) {
+  LabelData _freshData(LabelTemplate template, {String? foodName}) {
+    return switch (template.type) {
       LabelTemplateType.pokeBowlBurrito => foodName == null
           ? PokeBowlLabelData.initial()
           : PokeBowlLabelData.initial().copyWith(productName: foodName),
       LabelTemplateType.foodRotation => FoodRotationLabelData.initial().copyWith(
           foodName: foodName ?? '',
         ),
+      LabelTemplateType.custom => () {
+          final base = CustomLabelData.initial(template);
+          return foodName == null
+              ? base
+              : base.withFieldValue(LabelFieldKey.foodName, foodName);
+        }(),
     };
   }
 

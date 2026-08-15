@@ -59,6 +59,25 @@ class FoodRotationFieldsEditor extends ConsumerWidget {
           decoration: const InputDecoration(labelText: 'Employee'),
           onChanged: controller.updateEmployee,
         ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            const Expanded(
+              child: Text('Show PH', style: TextStyle(fontSize: 13)),
+            ),
+            Switch(
+              value: data.showPh,
+              onChanged: controller.toggleShowPh,
+            ),
+          ],
+        ),
+        if (data.showPh)
+          TextFormField(
+            key: ValueKey('ph-${state.formGeneration}'),
+            initialValue: data.ph,
+            decoration: const InputDecoration(labelText: 'PH'),
+            onChanged: controller.updatePh,
+          ),
       ],
     );
   }

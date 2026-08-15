@@ -40,8 +40,17 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     );
 
     _paintFoodName(canvas, data);
-    _paintPrepDateTime(canvas, data);
-    _paintUseByBox(canvas, data);
+
+    // PH sits right under the food name; when hidden, prep date/time and
+    // the use-by box shift up to take its place rather than leaving a gap.
+    var top = 210.0;
+    if (data.showPh) {
+      _paintPh(canvas, data, 160);
+      top = 230;
+    }
+
+    _paintPrepDateTime(canvas, data, top);
+    _paintUseByBox(canvas, data, top + 70);
     _paintEmployee(canvas, data);
     _paintOuterBorder(canvas);
   }
@@ -79,12 +88,16 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     );
   }
 
-  void _paintPrepDateTime(Canvas canvas, FoodRotationLabelData data) {
+  /// Directly under the food name — only painted when
+  /// [FoodRotationLabelData.showPh] is true; the caller shifts everything
+  /// below it down to make room, rather than this leaving a gap when hidden.
+  void _paintPh(Canvas canvas, FoodRotationLabelData data, double top) {
+    final ph = data.ph.trim().isEmpty ? '-' : data.ph.trim();
     _drawText(
       canvas,
-      'PREP DATE & TIME: ${_dateFormat.format(data.prepDateTime)}',
+      'PH: $ph',
       left: 40,
-      top: 210,
+      top: top,
       style: const TextStyle(
         color: Colors.black,
         fontSize: 26,
@@ -93,21 +106,34 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     );
   }
 
-  void _paintUseByBox(Canvas canvas, FoodRotationLabelData data) {
-    const boxRect = Rect.fromLTWH(40, 280, designWidth - 80, 100);
+  void _paintPrepDateTime(Canvas canvas, FoodRotationLabelData data, double top) {
+    _drawText(
+      canvas,
+      'PREP DATE & TIME: ${_dateFormat.format(data.prepDateTime)}',
+      left: 40,
+      top: top,
+      style: const TextStyle(
+        color: Colors.black,
+        fontSize: 26,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+
+  void _paintUseByBox(Canvas canvas, FoodRotationLabelData data, double top) {
+    final boxRect = Rect.fromLTWH(40, top, designWidth - 80, 100);
     canvas.drawRect(
       boxRect,
       Paint()
         ..color = _boxColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
+        ..style = PaintingStyle.fill,
     );
     _drawText(
       canvas,
       'USE BY: ${_dateFormat.format(data.useBy)}',
       center: boxRect.center,
       style: const TextStyle(
-        color: Colors.black,
+        color: Colors.white,
         fontSize: 30,
         fontWeight: FontWeight.w800,
       ),
@@ -115,13 +141,14 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
   }
 
   void _paintEmployee(Canvas canvas, FoodRotationLabelData data) {
-    final employee = data.employee.trim().isEmpty ? '-' : data.employee.trim();
-    final text = 'EMPLOYEE: $employee';
     const style = TextStyle(
       color: Colors.black,
       fontSize: 26,
       fontWeight: FontWeight.w700,
     );
+
+    final employee = data.employee.trim().isEmpty ? '-' : data.employee.trim();
+    final text = 'EMPLOYEE: $employee';
     final width = _measureText(text, style);
     _drawText(
       canvas,

@@ -16,12 +16,20 @@ class TemplateCard extends StatelessWidget {
     required this.sampleData,
     required this.selected,
     required this.onTap,
+    this.onEdit,
+    this.onDuplicate,
+    this.onDelete,
   });
 
   final LabelTemplate template;
   final LabelData sampleData;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Only used for custom (non built-in) templates.
+  final VoidCallback? onEdit;
+  final VoidCallback? onDuplicate;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -48,9 +56,36 @@ class TemplateCard extends StatelessWidget {
                 child: LabelPreview(data: sampleData),
               ),
               const SizedBox(height: 14),
-              Text(
-                template.name,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      template.name,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                    ),
+                  ),
+                  if (!template.isBuiltIn)
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: PopupMenuButton<_TemplateAction>(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.more_vert, size: 18),
+                        tooltip: 'Template options',
+                        onSelected: (action) => switch (action) {
+                          _TemplateAction.edit => onEdit?.call(),
+                          _TemplateAction.duplicate => onDuplicate?.call(),
+                          _TemplateAction.delete => onDelete?.call(),
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(value: _TemplateAction.edit, child: Text('Edit')),
+                          PopupMenuItem(value: _TemplateAction.duplicate, child: Text('Duplicate')),
+                          PopupMenuItem(value: _TemplateAction.delete, child: Text('Delete')),
+                        ],
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 4),
               Text(
@@ -58,25 +93,37 @@ class TemplateCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 13, color: Colors.black54),
               ),
               const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: selected
-                    ? const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_circle, size: 16, color: AppTheme.success),
-                          SizedBox(width: 4),
-                          Text(
-                            'Selected',
-                            style: TextStyle(
-                              color: AppTheme.success,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      template.isBuiltIn ? 'Built-in' : 'Custom',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black54),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (selected)
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle, size: 16, color: AppTheme.success),
+                        SizedBox(width: 4),
+                        Text(
+                          'Selected',
+                          style: TextStyle(
+                            color: AppTheme.success,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
                           ),
-                        ],
-                      )
-                    : const SizedBox(height: 16),
+                        ),
+                      ],
+                    ),
+                ],
               ),
             ],
           ),
@@ -85,3 +132,5 @@ class TemplateCard extends StatelessWidget {
     );
   }
 }
+
+enum _TemplateAction { edit, duplicate, delete }

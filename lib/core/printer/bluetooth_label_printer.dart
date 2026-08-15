@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import 'chunked_writer.dart';
@@ -47,13 +48,29 @@ class BluetoothLabelPrinter implements LabelPrinter {
   }
 
   Future<void> _ensureBluetoothReady() async {
-    final granted = await PrintBluetoothThermal.isPermissionBluetoothGranted;
-    if (!granted) {
-      throw const PrinterException(
+    // print_bluetooth_thermal only *checks* BLUETOOTH_CONNECT (Android
+    // 12+); it never triggers the OS permission dialog itself, so we have
+    // to request it before checking, or a first-time user is never
+    // actually prompted — the app would just report "denied" forever.
+    // BLUETOOTH_SCAN is also required: the plugin's connect() internally
+    // calls BluetoothAdapter.cancelDiscovery(), which needs it even though
+    // this app never runs its own discovery scan.
+    final statuses = await [
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+    ].request();
+
+    final allGranted = statuses.values.every((s) => s.isGranted);
+    if (!allGranted) {
+      final permanentlyDenied = statuses.values.any((s) => s.isPermanentlyDenied);
+      throw PrinterException(
         PrinterErrorCode.bluetoothPermissionDenied,
-        'Bluetooth permission was denied. Please enable it in Settings.',
+        permanentlyDenied
+            ? 'Bluetooth permission was denied. Please enable "Nearby devices" for this app in Settings.'
+            : 'Bluetooth permission is required to connect to the printer.',
       );
     }
+
     final enabled = await PrintBluetoothThermal.bluetoothEnabled;
     if (!enabled) {
       throw const PrinterException(

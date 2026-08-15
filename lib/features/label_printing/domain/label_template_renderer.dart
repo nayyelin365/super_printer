@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import 'food_rotation_label_renderer.dart';
+import 'generic_label_renderer.dart';
 import 'label_data.dart';
 import 'label_template.dart';
 import 'poke_bowl_label_renderer.dart';
@@ -82,6 +83,7 @@ class LabelTemplateRenderers {
   static const Map<LabelTemplateType, LabelTemplateRenderer> _byType = {
     LabelTemplateType.pokeBowlBurrito: PokeBowlLabelRenderer(),
     LabelTemplateType.foodRotation: FoodRotationLabelRenderer(),
+    LabelTemplateType.custom: GenericLabelRenderer(),
   };
 
   static LabelTemplateRenderer forType(LabelTemplateType type) => _byType[type]!;

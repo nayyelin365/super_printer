@@ -10,6 +10,8 @@ class FoodRotationLabelData extends LabelData {
     required this.prepDateTime,
     required this.useBy,
     this.employee = '',
+    this.ph = '',
+    this.showPh = false,
   });
 
   final String foodName;
@@ -18,6 +20,13 @@ class FoodRotationLabelData extends LabelData {
   final DateTime useBy;
   final String employee;
 
+  /// Optional pH reading. Hidden by default — like
+  /// [PokeBowlLabelData.showBarcode], when [showPh] is false the renderer
+  /// must not just hide the value in place, it must not reserve space for
+  /// it either.
+  final String ph;
+  final bool showPh;
+
   @override
   LabelTemplateType get templateType => LabelTemplateType.foodRotation;
 
@@ -25,7 +34,7 @@ class FoodRotationLabelData extends LabelData {
     final now = DateTime.now();
     return FoodRotationLabelData(
       prepDateTime: now,
-      useBy: now.add(const Duration(days: 3)),
+      useBy: now.add(const Duration(hours: 24)),
     );
   }
 
@@ -34,12 +43,16 @@ class FoodRotationLabelData extends LabelData {
     DateTime? prepDateTime,
     DateTime? useBy,
     String? employee,
+    String? ph,
+    bool? showPh,
   }) {
     return FoodRotationLabelData(
       foodName: foodName ?? this.foodName,
       prepDateTime: prepDateTime ?? this.prepDateTime,
       useBy: useBy ?? this.useBy,
       employee: employee ?? this.employee,
+      ph: ph ?? this.ph,
+      showPh: showPh ?? this.showPh,
     );
   }
 }

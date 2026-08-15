@@ -21,11 +21,20 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
   static const double designHeight = LabelCanvas.designHeight;
 
   static const _headerHeight = 100.0;
-  static const _nameSectionHeight = 52.0;
-  static const _infoRowSectionHeight = 86.0;
+  static const _nameSectionHeight = 100.0;
+  static const _infoRowSectionHeight = 92.0;
   static const _datesSectionHeight = 82.0;
-  static const _barcodeSectionHeight =
-      designHeight - _headerHeight - _nameSectionHeight - _infoRowSectionHeight - _datesSectionHeight;
+
+  // The barcode's own footprint (bars + its digit row, which the `barcode`
+  // package draws inside this same height) plus a fixed trailing margin —
+  // not "whatever's left of the label", so a bigger/smaller barcode never
+  // leaves a mismatched gap below it. Any remaining slack is instead spent
+  // as an even top/bottom margin around the whole content block (see
+  // `_paintAtDesignScale`).
+  static const _barcodeWidth = 380.0;
+  static const _barcodeHeight = 170.0;
+  static const _barcodeBottomMargin = 30.0;
+  static const _barcodeSectionHeight = _barcodeHeight + _barcodeBottomMargin;
 
   static const _accentGray = Color(0xFF6B7280);
   static const _dividerColor = Color(0xFF706E6E);
@@ -96,7 +105,7 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
       center: const Offset(designWidth / 2, _headerHeight / 2),
       style: const TextStyle(
         color: Colors.black,
-        fontSize: 38,
+        fontSize: 45,
         fontWeight: FontWeight.w800,
         letterSpacing: 2,
       ),
@@ -111,10 +120,10 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
     _drawText(
       canvas,
       name,
-      center: Offset(designWidth / 2, top + 26),
+      center: Offset(designWidth / 2, top + 32),
       style: const TextStyle(
         color: Colors.black,
-        fontSize: 34,
+        fontSize: 45,
         fontWeight: FontWeight.w700,
       ),
       maxWidth: designWidth - 60,
@@ -146,7 +155,7 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
     );
     const totalValueStyle = TextStyle(
       color: Colors.black,
-      fontSize: 32,
+      fontSize: 35,
       fontWeight: FontWeight.w800,
     );
 
@@ -172,8 +181,8 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
       ),
     ];
 
-    final labelY = top + 28;
-    final valueY = labelY + 32;
+    final labelY = top + 26;
+    final valueY = labelY + 34;
     final bottom = top + _infoRowSectionHeight;
 
     final columnWidth = (designWidth - 80) / 3;
@@ -250,9 +259,10 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
   }
 
   void _paintBarcode(Canvas canvas, PokeBowlLabelData data, double top) {
-    const left = 60.0;
-    const height = 150.0;
-    const width = designWidth - 120;
+    const width = _barcodeWidth;
+    const height = _barcodeHeight;
+    const left = designWidth - 40 - width;
+    const fontHeight = 20.0;
 
     // 12-digit payload; the package computes and appends the 13th
     // (check) digit itself when rendering the bars.
@@ -261,36 +271,52 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
     final barcode = Barcode.ean13();
     if (!barcode.isValid(payload)) return;
 
+    // drawText: true is what gives a standard-looking EAN-13 — without it
+    // the package skips the taller guard bars and the classic digit
+    // placement (leading digit outside the left guard, two 6-digit groups,
+    // checksum outside the right guard), producing uniform-height bars
+    // with no numerals lined up under them.
     for (final element in barcode.make(
       payload,
       width: width,
       height: height,
-      drawText: false,
+      drawText: true,
+      fontHeight: fontHeight,
     )) {
-      if (element is BarcodeBar && element.black) {
-        canvas.drawRect(
-          Rect.fromLTWH(
-            left + element.left,
-            top + element.top,
-            element.width,
-            element.height,
-          ),
-          Paint()..color = Colors.black,
-        );
+      switch (element) {
+        case BarcodeBar(:final black) when black:
+          canvas.drawRect(
+            Rect.fromLTWH(
+              left + element.left,
+              top + element.top,
+              element.width,
+              element.height,
+            ),
+            Paint()..color = Colors.black,
+          );
+        case BarcodeText():
+          _paintBarcodeText(canvas, element, left, top);
+        default:
+          break;
       }
     }
+  }
 
-    _drawText(
-      canvas,
-      data.barcodeDisplay,
-      center: Offset(designWidth / 2, top + height + 20),
-      style: const TextStyle(
-        color: Colors.black,
-        fontSize: 26,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 3,
+  void _paintBarcodeText(Canvas canvas, BarcodeText element, double originX, double originY) {
+    final textAlign = switch (element.align) {
+      BarcodeTextAlign.left => TextAlign.left,
+      BarcodeTextAlign.center => TextAlign.center,
+      BarcodeTextAlign.right => TextAlign.right,
+    };
+    final painter = TextPainter(
+      text: TextSpan(
+        text: element.text,
+        style: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.w600),
       ),
-    );
+      textDirection: ui.TextDirection.ltr,
+      textAlign: textAlign,
+    )..layout(minWidth: element.width, maxWidth: element.width);
+    painter.paint(canvas, Offset(originX + element.left, originY + element.top));
   }
 
   /// Paints [text] and returns its rendered width, so callers can lay out

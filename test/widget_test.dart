@@ -30,7 +30,7 @@ void main() {
     expect(find.text('Custom Poke Bowl / Burrito'), findsOneWidget);
     expect(find.text('Food Rotation Label'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Continue'));
+    await tester.tap(find.widgetWithText(FloatingActionButton, 'Continue'));
     await tester.pumpAndSettle();
 
     // Straight to the print page — no Food Selection in between.
@@ -71,7 +71,7 @@ void main() {
 
     await tester.tap(find.text('Food Rotation Label'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Continue'));
+    await tester.tap(find.widgetWithText(FloatingActionButton, 'Continue'));
     await tester.pumpAndSettle();
 
     // Food Selection screen.
@@ -82,7 +82,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'egg');
     await tester.pumpAndSettle();
     expect(find.text('Classic Pancakes'), findsNothing);
-    expect(find.text('Scrambled Eggs & Toast'), findsOneWidget);
+    expect(find.text('Egg & Cheese Sandwich'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'zzzzz');
     await tester.pumpAndSettle();
@@ -105,6 +105,14 @@ void main() {
     expect(find.widgetWithText(TextFormField, 'Net Weight (lb)'), findsNothing);
     expect(find.textContaining('Barcode:'), findsNothing);
     expect(find.text('Show Barcode'), findsNothing);
+
+    // PH is off by default (no field shown, just the switch), and appears
+    // once toggled on.
+    expect(find.text('Show PH'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'PH'), findsNothing);
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextFormField, 'PH'), findsOneWidget);
 
     expect(find.text('Print Details'), findsOneWidget);
     expect(find.widgetWithText(ElevatedButton, 'Print'), findsOneWidget);
@@ -129,7 +137,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Food Rotation Label'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Continue'));
+    await tester.tap(find.widgetWithText(FloatingActionButton, 'Continue'));
     await tester.pumpAndSettle();
 
     expect(find.text('Select Food'), findsOneWidget);

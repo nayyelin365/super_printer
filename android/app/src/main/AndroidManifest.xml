@@ -1,8 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Classic Bluetooth (SPP) connection to already-paired printers
-         (Android 12+). No BLUETOOTH_SCAN/ACCESS_FINE_LOCATION needed since
-         discovery only lists already-bonded devices, not a live scan. -->
+         (Android 12+). We don't do our own device-discovery scan, but the
+         connect() call itself invokes BluetoothAdapter.cancelDiscovery()
+         internally, which requires BLUETOOTH_SCAN — without it, connect
+         silently fails on Android 12+ even with BLUETOOTH_CONNECT granted.
+         neverForLocation is safe since we never read scan results. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
     <!-- Legacy Bluetooth permissions (Android 11 and below) -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
