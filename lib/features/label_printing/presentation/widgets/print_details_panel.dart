@@ -9,6 +9,7 @@ import '../../../../shared/widgets/status_badge.dart';
 import '../../../../shared/widgets/app_sidebar.dart';
 import '../../../printer_workspace/presentation/app_section_controller.dart';
 import '../../../template_selection/presentation/template_selection_screen.dart';
+import '../../domain/food_rotation_label_data.dart';
 import '../../domain/label_data.dart';
 import '../../domain/label_template.dart';
 import '../../domain/poke_bowl_pricing.dart';
@@ -46,6 +47,12 @@ class PrintDetailsPanel extends ConsumerWidget {
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
+              if (state.labelData is FoodRotationLabelData)
+                IconButton(
+                  onPressed: controller.saveCurrentFoodSettings,
+                  icon: const Icon(Icons.save_outlined),
+                  tooltip: 'Save hours, employee & PH for this food',
+                ),
               SizedBox(
                 width: 120,
                 child: ElevatedButton(

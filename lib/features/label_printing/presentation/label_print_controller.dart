@@ -5,6 +5,8 @@ import '../../../core/printer/models/label_size.dart';
 import '../../../core/printer/models/printer_calibration.dart';
 import '../../../core/printer/printer_exceptions.dart';
 import '../../../core/printer/printer_session_controller.dart';
+import '../../food_selection/domain/food_catalog.dart';
+import '../../food_selection/presentation/food_selection_controller.dart';
 import '../domain/custom_label_data.dart';
 import '../domain/food_rotation_label_data.dart';
 import '../domain/label_component.dart';
@@ -316,21 +318,35 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
   /// switching templates (or pre-filling a food name picked on the Food
   /// Selection screen). Never touches the food catalog, the template
   /// catalog, or any other template's data.
-  void startNewLabel(LabelTemplate template, {String? foodName}) {
+  ///
+  /// [food] is the catalog entry [foodName] came from — when it carries
+  /// saved Use By hours, employee, and pH (see [saveCurrentFoodSettings]),
+  /// a Food Rotation label pre-fills those instead of the bare defaults.
+  void startNewLabel(LabelTemplate template, {String? foodName, FoodModel? food}) {
     state = LabelPrintState(
-      labelData: _freshData(template, foodName: foodName),
+      labelData: _freshData(template, foodName: foodName, food: food),
+      useByAmount: food?.useByHours ?? 24,
       formGeneration: state.formGeneration + 1,
     );
   }
 
-  LabelData _freshData(LabelTemplate template, {String? foodName}) {
+  LabelData _freshData(LabelTemplate template, {String? foodName, FoodModel? food}) {
     return switch (template.type) {
       LabelTemplateType.pokeBowlBurrito => foodName == null
           ? PokeBowlLabelData.initial()
           : PokeBowlLabelData.initial().copyWith(productName: foodName),
-      LabelTemplateType.foodRotation => FoodRotationLabelData.initial().copyWith(
-          foodName: foodName ?? '',
-        ),
+      LabelTemplateType.foodRotation => () {
+          final now = DateTime.now();
+          final ph = food?.ph ?? '';
+          return FoodRotationLabelData(
+            foodName: foodName ?? '',
+            prepDateTime: now,
+            useBy: now.add(useByDuration(food?.useByHours ?? 24)),
+            employee: food?.employee ?? '',
+            ph: ph,
+            showPh: ph.trim().isNotEmpty,
+          );
+        }(),
       LabelTemplateType.custom => () {
           final base = CustomLabelData.initial(template);
           return foodName == null
@@ -338,6 +354,26 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
               : base.withFieldValue(LabelFieldKey.foodName, foodName);
         }(),
     };
+  }
+
+  /// Saves the current Use By hours, employee, and pH back onto the food
+  /// catalog entry for this label's food name, so selecting that food
+  /// again later pre-fills them instead of the bare defaults. A no-op if
+  /// this isn't a Food Rotation label or the food name is blank.
+  void saveCurrentFoodSettings() {
+    final data = state.labelData;
+    if (data is! FoodRotationLabelData) return;
+    final name = data.foodName.trim();
+    if (name.isEmpty) return;
+
+    _ref.read(foodCatalogProvider.notifier).saveFoodSettings(
+          name,
+          useByHours: state.useByAmount,
+          employee: data.employee.trim().isEmpty ? null : data.employee.trim(),
+          ph: data.showPh && data.ph.trim().isNotEmpty ? data.ph.trim() : null,
+        );
+
+    state = state.copyWith(resultMessage: () => 'Saved settings for "$name".');
   }
 
   Future<void> print() async {

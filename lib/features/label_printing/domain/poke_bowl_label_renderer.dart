@@ -40,7 +40,7 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
   static const _dividerColor = Color(0xFF706E6E);
   static const _borderColor = Color(0xFFDBDBDB);
 
-  static final _dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
+  static final _dateFormat = DateFormat('MM/dd/yyyy - hh:mm a');
 
   @override
   void paint(Canvas canvas, Size outputSize, LabelData data) {
@@ -231,7 +231,7 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
     final textTop = top + 22;
     const labelStyle = TextStyle(
       color: Colors.black,
-      fontSize: 26,
+      fontSize: 25,
       fontWeight: FontWeight.w700,
     );
 

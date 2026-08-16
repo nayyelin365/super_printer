@@ -5,6 +5,7 @@ import '../../../shared/theme/app_theme.dart';
 import '../../label_printing/presentation/label_print_controller.dart';
 import '../../printer_workspace/presentation/printer_workspace_screen.dart';
 import '../../template_selection/presentation/template_selection_controller.dart';
+import '../domain/food_catalog.dart';
 import 'food_selection_controller.dart';
 import 'widgets/food_card.dart';
 
@@ -95,9 +96,9 @@ class FoodSelectionScreen extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         final food = foods[index];
                         return FoodCard(
-                          name: food,
+                          name: food.name,
                           onSelect: () => _selectFood(context, ref, food),
-                          onRemove: () => _confirmRemoveFood(context, ref, food),
+                          onRemove: () => _confirmRemoveFood(context, ref, food.name),
                         );
                       },
                     ),
@@ -108,11 +109,11 @@ class FoodSelectionScreen extends ConsumerWidget {
     );
   }
 
-  void _selectFood(BuildContext context, WidgetRef ref, String food) {
+  void _selectFood(BuildContext context, WidgetRef ref, FoodModel food) {
     final template = ref.read(selectedLabelTemplateProvider);
     ref
         .read(labelPrintControllerProvider.notifier)
-        .startNewLabel(template, foodName: food);
+        .startNewLabel(template, foodName: food.name, food: food);
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const PrinterWorkspaceScreen()),
     );

@@ -19,7 +19,7 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
   static const _borderColor = Color(0xFFDBDBDB);
   static const _boxColor = Color(0xFF10202E);
 
-  static final _dateFormat = DateFormat('MM/dd/yyyy hh:mm a');
+  static final _dateFormat = DateFormat('MM/dd/yyyy - hh:mm a');
 
   @override
   void paint(Canvas canvas, Size outputSize, LabelData data) {
@@ -101,7 +101,7 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
       top: top,
       style: const TextStyle(
         color: Colors.black,
-        fontSize: 26,
+        fontSize: 40,
         fontWeight: FontWeight.w700,
       ),
     );
@@ -115,7 +115,7 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
       top: top,
       style: const TextStyle(
         color: Colors.black,
-        fontSize: 30,
+        fontSize: 40,
         fontWeight: FontWeight.w700,
       ),
     );
@@ -144,7 +144,7 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
   void _paintEmployee(Canvas canvas, FoodRotationLabelData data) {
     const style = TextStyle(
       color: Colors.black,
-      fontSize: 26,
+      fontSize: 40,
       fontWeight: FontWeight.w700,
     );
 
