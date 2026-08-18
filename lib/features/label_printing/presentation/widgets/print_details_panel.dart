@@ -14,6 +14,7 @@ import '../../domain/label_data.dart';
 import '../../domain/label_template.dart';
 import '../../domain/poke_bowl_pricing.dart';
 import '../label_print_controller.dart';
+import '../poke_bowl_pricing_controller.dart';
 
 class PrintDetailsPanel extends ConsumerWidget {
   const PrintDetailsPanel({super.key});
@@ -23,6 +24,7 @@ class PrintDetailsPanel extends ConsumerWidget {
     final session = ref.watch(printerSessionProvider);
     final state = ref.watch(labelPrintControllerProvider);
     final controller = ref.read(labelPrintControllerProvider.notifier);
+    final pricing = ref.watch(pokeBowlPricingProvider);
 
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
 
@@ -66,37 +68,20 @@ class PrintDetailsPanel extends ConsumerWidget {
 
           if (state.labelData case final PokeBowlLabelData pokeBowl) ...[
             const _SectionLabel('BASE PRICE'),
-            for (var i = 0; i < basePriceOptions.length; i += 2)
-              Padding(
-                padding: EdgeInsets.only(bottom: i + 2 < basePriceOptions.length ? 2 : 0),
-                child: Row(
-                  children: [
-                    Expanded(child: _BasePriceButton(basePriceOptions[i], pokeBowl, controller)),
-                    Expanded(
-                      child: i + 1 < basePriceOptions.length
-                          ? _BasePriceButton(basePriceOptions[i + 1], pokeBowl, controller)
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
+            _priceGrid([
+              for (final option in pricing.basePrices)
+                _BasePriceButton(
+                  option,
+                  selected: pokeBowl.basePriceLabel == option.label,
+                  controller: controller,
                 ),
-              ),
+            ]),
             const SizedBox(height: 14),
 
             const _SectionLabel('EXTRA'),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final extra in extraPriceOptions)
-                  SizedBox(
-                    height: 32,
-                    child: OutlinedButton(
-                      onPressed: () => controller.addExtraPrice(extra),
-                      child: Text('+ \$${extra.toStringAsFixed(2)}'),
-                    ),
-                  ),
-              ],
-            ),
+            _priceGrid([
+              for (final extra in pricing.extras) _ExtraPriceButton(extra, controller),
+            ]),
             const SizedBox(height: 14),
 
             const _SectionLabel('TOTAL AMOUNT'),
@@ -337,23 +322,106 @@ class PrintDetailsPanel extends ConsumerWidget {
   }
 }
 
+/// Lays [tiles] out as a fixed-column grid (default 3, matching the
+/// protein × size price board this mirrors) — plain Rows/Expanded rather
+/// than a `GridView`, since the latter conflicts with this panel's own
+/// scrollable ancestor (see git history for the base-price section).
+Widget _priceGrid(List<Widget> tiles, {int columns = 3}) {
+  final rows = <Widget>[];
+  for (var i = 0; i < tiles.length; i += columns) {
+    final rowTiles = tiles.skip(i).take(columns).toList();
+    rows.add(
+      Padding(
+        padding: EdgeInsets.only(bottom: i + columns < tiles.length ? 8 : 0),
+        child: Row(
+          children: [
+            for (var j = 0; j < columns; j++) ...[
+              if (j > 0) const SizedBox(width: 8),
+              Expanded(child: j < rowTiles.length ? rowTiles[j] : const SizedBox.shrink()),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  return Column(children: rows);
+}
+
 class _BasePriceButton extends StatelessWidget {
-  const _BasePriceButton(this.option, this.pokeBowl, this.controller);
+  const _BasePriceButton(this.option, {required this.selected, required this.controller});
 
   final BasePriceOption option;
-  final PokeBowlLabelData pokeBowl;
+  final bool selected;
   final LabelPrintController controller;
 
   @override
   Widget build(BuildContext context) {
-    final selected = pokeBowl.totalAmount == option.amount;
-    return ChoiceChip(
-      label: Text(
-        '${option.label} \$${option.amount.toStringAsFixed(2)}',
-        overflow: TextOverflow.ellipsis,
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => controller.selectBasePrice(option),
+      child: Container(
+        height: 60,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: option.color,
+          borderRadius: BorderRadius.circular(10),
+          border: selected ? Border.all(color: Colors.black87, width: 3) : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              option.label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '\$${option.amount.toStringAsFixed(2)}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
       ),
-      selected: selected,
-      onSelected: (_) => controller.selectBasePrice(option.amount),
+    );
+  }
+}
+
+class _ExtraPriceButton extends StatelessWidget {
+  const _ExtraPriceButton(this.option, this.controller);
+
+  final ExtraPriceOption option;
+  final LabelPrintController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: () => controller.addExtraPrice(option),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: option.color,
+        side: BorderSide(color: option.color),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      child: Text(
+        '${option.label} +\$${option.amount.toStringAsFixed(2)}',
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+      ),
     );
   }
 }

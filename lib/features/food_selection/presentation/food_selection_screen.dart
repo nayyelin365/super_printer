@@ -9,6 +9,20 @@ import '../domain/food_catalog.dart';
 import 'food_selection_controller.dart';
 import 'widgets/food_card.dart';
 
+/// Preset swatches offered in the add-food dialog's category color picker.
+const _foodCategoryColors = [
+  Color(0xFFE03131),
+  Color(0xFFF08C00),
+  Color(0xFFF5C518),
+  Color(0xFF2F9E44),
+  Color(0xFF0CA678),
+  Color(0xFF1971C2),
+  Color(0xFF3B5BDB),
+  Color(0xFF9C36B5),
+  Color(0xFFE64980),
+  Color(0xFF495057),
+];
+
 /// Step in the printing flow for templates that need a food/menu item
 /// picked first (see [LabelTemplate.requiresFoodSelection]). Selecting one
 /// starts a fresh label (see [LabelPrintController.startNewLabel]) for the
@@ -87,16 +101,17 @@ class FoodSelectionScreen extends ConsumerWidget {
                   : GridView.builder(
                       padding: const EdgeInsets.all(20),
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 260,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: 1.5,
+                        maxCrossAxisExtent: 150,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 1.3,
                       ),
                       itemCount: foods.length,
                       itemBuilder: (context, index) {
                         final food = foods[index];
                         return FoodCard(
                           name: food.name,
+                          color: food.color,
                           onSelect: () => _selectFood(context, ref, food),
                           onRemove: () => _confirmRemoveFood(context, ref, food.name),
                         );
@@ -126,52 +141,99 @@ class FoodSelectionScreen extends ConsumerWidget {
     // showDialog() resolves, so a controller disposed immediately after
     // would be used-after-dispose.
     var enteredName = '';
+    Color? selectedColor;
 
-    final name = await showDialog<String>(
+    final result = await showDialog<({String name, Color? color})>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Add Food'),
-          content: Form(
-            key: formKey,
-            child: TextFormField(
-              autofocus: true,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(hintText: 'Food name'),
-              onChanged: (value) => enteredName = value,
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Enter a food name' : null,
-              onFieldSubmitted: (value) {
-                if (formKey.currentState!.validate()) {
-                  Navigator.of(dialogContext).pop(value.trim());
-                }
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  Navigator.of(dialogContext).pop(enteredName.trim());
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (dialogContext, setState) {
+            return AlertDialog(
+              title: const Text('Add Food'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(hintText: 'Food name'),
+                      onChanged: (value) => enteredName = value,
+                      validator: (value) => (value == null || value.trim().isEmpty)
+                          ? 'Enter a food name'
+                          : null,
+                      onFieldSubmitted: (value) {
+                        if (formKey.currentState!.validate()) {
+                          Navigator.of(dialogContext).pop((name: value.trim(), color: selectedColor));
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Category color (optional)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final color in _foodCategoryColors)
+                          GestureDetector(
+                            onTap: () => setState(
+                              () => selectedColor = selectedColor == color ? null : color,
+                            ),
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: selectedColor == color ? Colors.black87 : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                              child: selectedColor == color
+                                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                                  : null,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (formKey.currentState!.validate()) {
+                      Navigator.of(dialogContext)
+                          .pop((name: enteredName.trim(), color: selectedColor));
+                    }
+                  },
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
 
-    if (name == null || name.isEmpty || !context.mounted) return;
+    if (result == null || result.name.isEmpty || !context.mounted) return;
 
-    final added = await ref.read(foodCatalogProvider.notifier).addFood(name);
+    final added =
+        await ref.read(foodCatalogProvider.notifier).addFood(result.name, color: result.color);
     if (!added && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"$name" is already in the list.')),
+        SnackBar(content: Text('"${result.name}" is already in the list.')),
       );
     }
   }

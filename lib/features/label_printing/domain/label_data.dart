@@ -1,4 +1,5 @@
 import 'label_template.dart';
+import 'poke_bowl_pricing.dart';
 
 /// Base type for a template's label data. Each template owns its own
 /// concrete subclass with only the fields it needs — see
@@ -22,8 +23,9 @@ class PokeBowlLabelData extends LabelData {
   const PokeBowlLabelData({
     this.productName = 'CUSTOM POKE BOWL / BURRITO',
     this.productType = '',
-    this.netWeight,
-    this.pricePerLb,
+    this.basePriceLabel,
+    this.basePriceAmount,
+    this.extraLines = const [],
     this.totalAmount = 0,
     required this.packedAt,
     required this.useBy,
@@ -36,8 +38,18 @@ class PokeBowlLabelData extends LabelData {
 
   final String productName;
   final String productType;
-  final double? netWeight;
-  final double? pricePerLb;
+
+  /// The currently selected base price tile's name/amount (only one can be
+  /// active — see `LabelPrintController.selectBasePrice`), or null if none
+  /// is selected (e.g. Total Amount was typed by hand instead).
+  final String? basePriceLabel;
+  final double? basePriceAmount;
+
+  /// Extra add-ons tapped on top of the base price, in the order added —
+  /// the same extra can appear more than once (see
+  /// `LabelPrintController.addExtraPrice`).
+  final List<PokeBowlPriceLine> extraLines;
+
   final double totalAmount;
   final DateTime packedAt;
   @override
@@ -50,6 +62,14 @@ class PokeBowlLabelData extends LabelData {
 
   @override
   LabelTemplateType get templateType => LabelTemplateType.pokeBowlBurrito;
+
+  /// The itemized price list the label prints: the selected base price (if
+  /// any) followed by every extra, in the order added.
+  List<PokeBowlPriceLine> get priceLines => [
+        if (basePriceLabel != null && basePriceAmount != null)
+          PokeBowlPriceLine(basePriceLabel!, basePriceAmount!),
+        ...extraLines,
+      ];
 
   /// The 12-digit EAN-13 payload (before the check digit): [barcodePrefix]
   /// with the total amount, in cents, zero-padded into the last 4 digits.
@@ -86,8 +106,9 @@ class PokeBowlLabelData extends LabelData {
   PokeBowlLabelData copyWith({
     String? productName,
     String? productType,
-    double? Function()? netWeight,
-    double? Function()? pricePerLb,
+    String? Function()? basePriceLabel,
+    double? Function()? basePriceAmount,
+    List<PokeBowlPriceLine>? extraLines,
     double? totalAmount,
     DateTime? packedAt,
     DateTime? useBy,
@@ -96,8 +117,9 @@ class PokeBowlLabelData extends LabelData {
     return PokeBowlLabelData(
       productName: productName ?? this.productName,
       productType: productType ?? this.productType,
-      netWeight: netWeight != null ? netWeight() : this.netWeight,
-      pricePerLb: pricePerLb != null ? pricePerLb() : this.pricePerLb,
+      basePriceLabel: basePriceLabel != null ? basePriceLabel() : this.basePriceLabel,
+      basePriceAmount: basePriceAmount != null ? basePriceAmount() : this.basePriceAmount,
+      extraLines: extraLines ?? this.extraLines,
       totalAmount: totalAmount ?? this.totalAmount,
       packedAt: packedAt ?? this.packedAt,
       useBy: useBy ?? this.useBy,

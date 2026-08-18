@@ -13,6 +13,7 @@ import '../domain/label_component.dart';
 import '../domain/label_data.dart';
 import '../domain/label_template.dart';
 import '../domain/label_template_renderer.dart';
+import '../domain/poke_bowl_pricing.dart';
 
 class LabelPrintState {
   LabelPrintState({
@@ -113,60 +114,55 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     );
   }
 
-  void updateNetWeight(String value) {
-    final data = state.labelData;
-    if (data is! PokeBowlLabelData) return;
-    final parsed = double.tryParse(value);
-    state = state.copyWith(
-      labelData: data.copyWith(netWeight: () => parsed),
-      resultMessage: () => null,
-    );
-  }
-
-  void updatePricePerLb(String value) {
-    final data = state.labelData;
-    if (data is! PokeBowlLabelData) return;
-    final parsed = double.tryParse(value);
-    state = state.copyWith(
-      labelData: data.copyWith(pricePerLb: () => parsed),
-      resultMessage: () => null,
-    );
-  }
-
   void updateAmount(String value) {
     final data = state.labelData;
     if (data is! PokeBowlLabelData) return;
     final parsed = double.tryParse(value) ?? 0;
     state = state.copyWith(
       amountText: value,
-      labelData: data.copyWith(totalAmount: parsed),
+      // Typing over the total by hand means the itemized base/extra
+      // selections (if any) no longer necessarily add up to it, so the
+      // label's price list should stop showing them.
+      labelData: data.copyWith(
+        basePriceLabel: () => null,
+        basePriceAmount: () => null,
+        extraLines: const [],
+        totalAmount: parsed,
+      ),
       resultMessage: () => null,
     );
   }
 
-  /// Sets Total Amount to [amount] outright — for the base-price quick
-  /// picks, of which only one applies at a time.
-  void selectBasePrice(double amount) {
+  /// Sets the base price to [option] — of which only one applies at a
+  /// time — and recomputes Total Amount from it plus any extras already
+  /// added.
+  void selectBasePrice(BasePriceOption option) {
     final data = state.labelData;
     if (data is! PokeBowlLabelData) return;
-    state = state.copyWith(
-      amountText: _formatAmount(amount),
-      amountGeneration: state.amountGeneration + 1,
-      labelData: data.copyWith(totalAmount: amount),
-      resultMessage: () => null,
-    );
-  }
-
-  /// Adds [amount] on top of the current Total Amount — for the extra-price
-  /// quick picks, which can be tapped any number of times.
-  void addExtraPrice(double amount) {
-    final data = state.labelData;
-    if (data is! PokeBowlLabelData) return;
-    final total = data.totalAmount + amount;
+    final total = option.amount + _sumOf(data.extraLines);
     state = state.copyWith(
       amountText: _formatAmount(total),
       amountGeneration: state.amountGeneration + 1,
-      labelData: data.copyWith(totalAmount: total),
+      labelData: data.copyWith(
+        basePriceLabel: () => option.label,
+        basePriceAmount: () => option.amount,
+        totalAmount: total,
+      ),
+      resultMessage: () => null,
+    );
+  }
+
+  /// Appends [option] to the extras list — unlike [selectBasePrice], this
+  /// can be tapped any number of times, each adding another line.
+  void addExtraPrice(ExtraPriceOption option) {
+    final data = state.labelData;
+    if (data is! PokeBowlLabelData) return;
+    final extraLines = [...data.extraLines, PokeBowlPriceLine(option.label, option.amount)];
+    final total = (data.basePriceAmount ?? 0) + _sumOf(extraLines);
+    state = state.copyWith(
+      amountText: _formatAmount(total),
+      amountGeneration: state.amountGeneration + 1,
+      labelData: data.copyWith(extraLines: extraLines, totalAmount: total),
       resultMessage: () => null,
     );
   }
@@ -177,10 +173,18 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     state = state.copyWith(
       amountText: '',
       amountGeneration: state.amountGeneration + 1,
-      labelData: data.copyWith(totalAmount: 0),
+      labelData: data.copyWith(
+        basePriceLabel: () => null,
+        basePriceAmount: () => null,
+        extraLines: const [],
+        totalAmount: 0,
+      ),
       resultMessage: () => null,
     );
   }
+
+  static double _sumOf(List<PokeBowlPriceLine> lines) =>
+      lines.fold(0.0, (sum, line) => sum + line.amount);
 
   static String _formatAmount(double amount) {
     return amount % 1 == 0 ? amount.toStringAsFixed(0) : amount.toStringAsFixed(2);

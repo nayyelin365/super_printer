@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// A food/menu item in the catalog, optionally carrying saved Food Rotation
 /// label settings (hours until use-by, employee, pH) from the last time
 /// someone hit Save on the print page for it — so picking the same food
@@ -8,6 +10,7 @@ class FoodModel {
     this.useByHours,
     this.employee,
     this.ph,
+    this.color,
   });
 
   final String name;
@@ -15,12 +18,33 @@ class FoodModel {
   final String? employee;
   final String? ph;
 
+  /// Category color picked when the food was added — shown as the card's
+  /// accent so foods in the same category are easy to spot at a glance.
+  /// Null means uncategorized (card falls back to a neutral look).
+  final Color? color;
+
+  FoodModel copyWith({
+    int? Function()? useByHours,
+    String? Function()? employee,
+    String? Function()? ph,
+    Color? Function()? color,
+  }) {
+    return FoodModel(
+      name: name,
+      useByHours: useByHours != null ? useByHours() : this.useByHours,
+      employee: employee != null ? employee() : this.employee,
+      ph: ph != null ? ph() : this.ph,
+      color: color != null ? color() : this.color,
+    );
+  }
+
   factory FoodModel.fromJson(Map<String, dynamic> json) {
     return FoodModel(
       name: json['name'] as String,
       useByHours: json['useByHours'] as int?,
       employee: json['employee'] as String?,
       ph: json['ph'] as String?,
+      color: json['color'] != null ? Color(json['color'] as int) : null,
     );
   }
 
@@ -30,6 +54,7 @@ class FoodModel {
       if (useByHours != null) 'useByHours': useByHours,
       if (employee != null) 'employee': employee,
       if (ph != null) 'ph': ph,
+      if (color != null) 'color': color!.toARGB32(),
     };
   }
 }

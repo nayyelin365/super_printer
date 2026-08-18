@@ -5,6 +5,7 @@ import '../../../shared/theme/app_theme.dart';
 import '../domain/label_template.dart';
 import 'label_print_controller.dart';
 import 'widgets/custom_template_fields_editor.dart';
+import 'widgets/edit_pricing_dialog.dart';
 import 'widgets/food_rotation_fields_editor.dart';
 import 'widgets/label_preview.dart';
 import 'widgets/poke_bowl_fields_editor.dart';
@@ -18,34 +19,48 @@ class LabelPrintScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Builder(
-          builder: (context) => Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 20, 10),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: AppTheme.border)),
-            ),
-            child: Row(
-              children: [
-                if (Navigator.of(context).canPop())
-                  IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.arrow_back),
-                    tooltip: 'Back',
-                  )
-                else
-                  const Padding(
-                    padding: EdgeInsets.only(left: 8, right: 8),
-                    child: Icon(Icons.print_outlined),
+        Consumer(
+          builder: (context, ref, _) {
+            final template = ref.watch(labelPrintControllerProvider).template;
+            return Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 20, 10),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(bottom: BorderSide(color: AppTheme.border)),
+              ),
+              child: Row(
+                children: [
+                  if (Navigator.of(context).canPop())
+                    IconButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back),
+                      tooltip: 'Back',
+                    )
+                  else
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8, right: 8),
+                      child: Icon(Icons.print_outlined),
+                    ),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      'Menu Label Print',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
                   ),
-                const SizedBox(width: 6),
-                const Text(
-                  'Menu Label Print',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-          ),
+                  if (template == LabelTemplateType.pokeBowlBurrito)
+                    IconButton(
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => const EditPricingDialog(),
+                      ),
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: 'Edit Pricing',
+                    ),
+                ],
+              ),
+            );
+          },
         ),
         Expanded(
           child: SingleChildScrollView(
@@ -61,9 +76,9 @@ class LabelPrintScreen extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(flex: 3, child: left),
+                        Expanded(child: left),
                         const SizedBox(width: 20),
-                        SizedBox(width: 360, child: right),
+                        Expanded(child: right),
                       ],
                     ),
                   );

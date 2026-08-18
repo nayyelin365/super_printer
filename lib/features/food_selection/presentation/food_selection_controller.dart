@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/food_catalog_storage.dart';
@@ -29,15 +30,17 @@ class FoodCatalogController extends StateNotifier<List<FoodModel>> {
 
   /// Adds [name] if it's non-empty and not already present
   /// (case-insensitive). Returns false without changing anything if it's a
-  /// duplicate, so the UI can tell the user why nothing happened.
-  Future<bool> addFood(String name) async {
+  /// duplicate, so the UI can tell the user why nothing happened. [color]
+  /// is the category color picked in the add-food dialog, shown as the
+  /// card's accent.
+  Future<bool> addFood(String name, {Color? color}) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return false;
     final alreadyExists =
         state.any((food) => food.name.toLowerCase() == trimmed.toLowerCase());
     if (alreadyExists) return false;
 
-    state = [...state, FoodModel(name: trimmed)];
+    state = [...state, FoodModel(name: trimmed, color: color)];
     await _storage.save(state);
     return true;
   }
@@ -61,11 +64,10 @@ class FoodCatalogController extends StateNotifier<List<FoodModel>> {
     if (index == -1) return;
 
     final updated = [...state];
-    updated[index] = FoodModel(
-      name: name,
-      useByHours: useByHours,
-      employee: employee,
-      ph: ph,
+    updated[index] = updated[index].copyWith(
+      useByHours: () => useByHours,
+      employee: () => employee,
+      ph: () => ph,
     );
     state = updated;
     await _storage.save(state);

@@ -50,7 +50,7 @@ void main() {
     expect(find.textContaining('Barcode:'), findsNothing);
 
     // Printer settings edit/close flow still works from the print page.
-    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.tap(find.byTooltip('Set up printer'));
     await tester.pumpAndSettle();
     expect(find.text('Printer Settings'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.close));
