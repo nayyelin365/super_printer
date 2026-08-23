@@ -5,6 +5,10 @@ import '../../features/alarm/presentation/alarm_list_screen.dart';
 import '../../features/food_selection/presentation/food_selection_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/label_printing/presentation/label_print_screen.dart';
+import '../../features/log_sheet/domain/log_type.dart';
+import '../../features/log_sheet/presentation/log_entry_form_screen.dart';
+import '../../features/log_sheet/presentation/log_home_screen.dart';
+import '../../features/log_sheet/presentation/log_sheet_screen.dart';
 import '../../features/printer_settings/presentation/printer_settings_screen.dart';
 import '../../features/template_builder/presentation/template_builder_screen.dart';
 import '../../features/template_selection/presentation/template_selection_screen.dart';
@@ -53,6 +57,17 @@ GoRouter createAppRouter() => GoRouter(
           builder: (context, state) => const AlarmEditorScreen(),
         ),
         GoRoute(path: '/settings', builder: (context, state) => const PrinterSettingsScreen()),
+        GoRoute(path: '/logs', builder: (context, state) => const LogHomeScreen()),
+        GoRoute(
+          path: '/logs/:logType',
+          builder: (context, state) =>
+              LogSheetScreen(logType: LogType.values.byName(state.pathParameters['logType']!)),
+        ),
+        GoRoute(
+          path: '/logs/:logType/entry',
+          builder: (context, state) =>
+              LogEntryFormScreen(logType: LogType.values.byName(state.pathParameters['logType']!)),
+        ),
       ],
     ),
   ],

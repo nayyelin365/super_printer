@@ -33,7 +33,12 @@ const _foodCategoryColors = [
 /// a card) and persisted through [FoodCatalogController] — selecting a food
 /// for a label never modifies the catalog, only these explicit actions do.
 class FoodSelectionScreen extends ConsumerWidget {
-  const FoodSelectionScreen({super.key});
+  const FoodSelectionScreen({super.key, this.showHeader = true});
+
+  /// False when embedded under a host screen that already renders its own
+  /// title/back/add-food chrome (see `LogHomeScreen`'s "Item Lists" tab) —
+  /// avoids stacking two app bars.
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,34 +50,40 @@ class FoodSelectionScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(bottom: BorderSide(color: AppTheme.border)),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.canPop() ? context.pop() : context.go('/templates'),
-                    icon: const Icon(Icons.arrow_back),
-                    tooltip: 'Back',
-                  ),
-                  const SizedBox(width: 4),
-                  const Expanded(
-                    child: Text(
-                      'Select Food',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            if (showHeader)
+              Container(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(bottom: BorderSide(color: AppTheme.border)),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => context.canPop()
+                          ? context.pop()
+                          : context.go('/templates'),
+                      icon: const Icon(Icons.arrow_back),
+                      tooltip: 'Back',
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => _showAddFoodDialog(context, ref),
-                    icon: const Icon(Icons.add),
-                    tooltip: 'Add food',
-                  ),
-                ],
+                    const SizedBox(width: 4),
+                    const Expanded(
+                      child: Text(
+                        'Select Food',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => showAddFoodDialog(context, ref),
+                      icon: const Icon(Icons.add),
+                      tooltip: 'Add food',
+                    ),
+                  ],
+                ),
               ),
-            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: TextField(
@@ -100,12 +111,13 @@ class FoodSelectionScreen extends ConsumerWidget {
                     )
                   : GridView.builder(
                       padding: const EdgeInsets.all(20),
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 150,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 1.3,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 150,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1.3,
+                          ),
                       itemCount: foods.length,
                       itemBuilder: (context, index) {
                         final food = foods[index];
@@ -114,7 +126,8 @@ class FoodSelectionScreen extends ConsumerWidget {
                           color: food.color,
                           targetTemperature: food.targetTemperature,
                           onSelect: () => _selectFood(context, ref, food),
-                          onRemove: () => _confirmRemoveFood(context, ref, food.name),
+                          onRemove: () =>
+                              _confirmRemoveFood(context, ref, food.name),
                         );
                       },
                     ),
@@ -133,143 +146,19 @@ class FoodSelectionScreen extends ConsumerWidget {
     context.push('/print');
   }
 
-  Future<void> _showAddFoodDialog(BuildContext context, WidgetRef ref) async {
-    final formKey = GlobalKey<FormState>();
-    // Tracked via onChanged rather than a TextEditingController — the
-    // dialog's own exit transition can still be rebuilding briefly after
-    // showDialog() resolves, so a controller disposed immediately after
-    // would be used-after-dispose.
-    var enteredName = '';
-    var enteredTargetTemperature = '';
-    Color? selectedColor;
-
-    final result =
-        await showDialog<({String name, Color? color, double? targetTemperature})>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setState) {
-            return AlertDialog(
-              title: const Text('Add Food'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      autofocus: true,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(hintText: 'Food name'),
-                      onChanged: (value) => enteredName = value,
-                      validator: (value) => (value == null || value.trim().isEmpty)
-                          ? 'Enter a food name'
-                          : null,
-                      onFieldSubmitted: (value) {
-                        if (formKey.currentState!.validate()) {
-                          Navigator.of(dialogContext).pop((
-                            name: value.trim(),
-                            color: selectedColor,
-                            targetTemperature: double.tryParse(enteredTargetTemperature),
-                          ));
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        hintText: 'Target Temperature (optional)',
-                        suffixText: '°F',
-                      ),
-                      onChanged: (value) => enteredTargetTemperature = value,
-                      validator: (value) => (value != null &&
-                              value.trim().isNotEmpty &&
-                              double.tryParse(value) == null)
-                          ? 'Enter a valid number'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Category color (optional)',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        for (final color in _foodCategoryColors)
-                          GestureDetector(
-                            onTap: () => setState(
-                              () => selectedColor = selectedColor == color ? null : color,
-                            ),
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: color,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: selectedColor == color ? Colors.black87 : Colors.transparent,
-                                  width: 2,
-                                ),
-                              ),
-                              child: selectedColor == color
-                                  ? const Icon(Icons.check, size: 16, color: Colors.white)
-                                  : null,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (formKey.currentState!.validate()) {
-                      Navigator.of(dialogContext).pop((
-                        name: enteredName.trim(),
-                        color: selectedColor,
-                        targetTemperature: double.tryParse(enteredTargetTemperature),
-                      ));
-                    }
-                  },
-                  child: const Text('Add'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (result == null || result.name.isEmpty || !context.mounted) return;
-
-    final added = await ref.read(foodCatalogProvider.notifier).addFood(
-          result.name,
-          color: result.color,
-          targetTemperature: result.targetTemperature,
-        );
-    if (!added && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${result.name}" is already in the list.')),
-      );
-    }
-  }
-
-  Future<void> _confirmRemoveFood(BuildContext context, WidgetRef ref, String food) async {
+  Future<void> _confirmRemoveFood(
+    BuildContext context,
+    WidgetRef ref,
+    String food,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Remove Food'),
-          content: Text('Remove "$food" from the food list? This can\'t be undone.'),
+          content: Text(
+            'Remove "$food" from the food list? This can\'t be undone.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -288,5 +177,166 @@ class FoodSelectionScreen extends ConsumerWidget {
     if (confirmed == true) {
       await ref.read(foodCatalogProvider.notifier).removeFood(food);
     }
+  }
+}
+
+/// Shows the "Add Food" dialog and, on confirm, adds it to the shared
+/// [foodCatalogProvider] catalog — a top-level function (not a method on
+/// [FoodSelectionScreen]) so a host screen embedding the food list header-less
+/// (e.g. `LogHomeScreen`) can trigger the same dialog from its own "Add Item"
+/// button instead of duplicating this logic.
+Future<void> showAddFoodDialog(BuildContext context, WidgetRef ref) async {
+  final formKey = GlobalKey<FormState>();
+  // Tracked via onChanged rather than a TextEditingController — the
+  // dialog's own exit transition can still be rebuilding briefly after
+  // showDialog() resolves, so a controller disposed immediately after
+  // would be used-after-dispose.
+  var enteredName = '';
+  var enteredTargetTemperature = '';
+  Color? selectedColor;
+
+  final result =
+      await showDialog<
+        ({String name, Color? color, double? targetTemperature})
+      >(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (dialogContext, setState) {
+              return AlertDialog(
+                title: const Text('Add Food'),
+                content: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        autofocus: true,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          hintText: 'Food name',
+                        ),
+                        onChanged: (value) => enteredName = value,
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
+                            ? 'Enter a food name'
+                            : null,
+                        onFieldSubmitted: (value) {
+                          if (formKey.currentState!.validate()) {
+                            Navigator.of(dialogContext).pop((
+                              name: value.trim(),
+                              color: selectedColor,
+                              targetTemperature: double.tryParse(
+                                enteredTargetTemperature,
+                              ),
+                            ));
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'Target Temperature (optional)',
+                          suffixText: '°F',
+                        ),
+                        onChanged: (value) => enteredTargetTemperature = value,
+                        validator: (value) =>
+                            (value != null &&
+                                value.trim().isNotEmpty &&
+                                double.tryParse(value) == null)
+                            ? 'Enter a valid number'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Category color (optional)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black54,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          for (final color in _foodCategoryColors)
+                            GestureDetector(
+                              onTap: () => setState(
+                                () => selectedColor = selectedColor == color
+                                    ? null
+                                    : color,
+                              ),
+                              child: Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: selectedColor == color
+                                        ? Colors.black87
+                                        : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: selectedColor == color
+                                    ? const Icon(
+                                        Icons.check,
+                                        size: 16,
+                                        color: Colors.white,
+                                      )
+                                    : null,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (formKey.currentState!.validate()) {
+                        Navigator.of(dialogContext).pop((
+                          name: enteredName.trim(),
+                          color: selectedColor,
+                          targetTemperature: double.tryParse(
+                            enteredTargetTemperature,
+                          ),
+                        ));
+                      }
+                    },
+                    child: const Text('Add'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+
+  if (result == null || result.name.isEmpty || !context.mounted) return;
+
+  final added = await ref
+      .read(foodCatalogProvider.notifier)
+      .addFood(
+        result.name,
+        color: result.color,
+        targetTemperature: result.targetTemperature,
+      );
+  if (!added && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('"${result.name}" is already in the list.')),
+    );
   }
 }

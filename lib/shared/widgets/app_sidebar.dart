@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-enum AppSection { print, alarms, settings }
+enum AppSection { print, logs, alarms, settings }
 
 /// Left navigation rail shown on the printing and settings screens.
 class AppSidebar extends StatelessWidget {
@@ -34,6 +34,13 @@ class AppSidebar extends StatelessWidget {
             selected: selected == AppSection.print,
             onTap: () => onSelect(AppSection.print),
             tooltip: 'Print',
+          ),
+          const SizedBox(height: 8),
+          _NavIcon(
+            icon: Icons.fact_check_outlined,
+            selected: selected == AppSection.logs,
+            onTap: () => onSelect(AppSection.logs),
+            tooltip: 'Log Sheet',
           ),
           const SizedBox(height: 8),
           _NavIcon(

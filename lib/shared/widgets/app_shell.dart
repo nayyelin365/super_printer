@@ -16,6 +16,7 @@ class AppShell extends StatelessWidget {
   AppSection get _selected {
     if (location.startsWith('/settings')) return AppSection.settings;
     if (location.startsWith('/alarms')) return AppSection.alarms;
+    if (location.startsWith('/logs')) return AppSection.logs;
     return AppSection.print;
   }
 
@@ -30,6 +31,7 @@ class AppShell extends StatelessWidget {
               // The Print tab's job is to start the print flow, which
               // begins at template choice, not the print page itself.
               AppSection.print => '/templates',
+              AppSection.logs => '/logs',
               AppSection.alarms => '/alarms',
               AppSection.settings => '/settings',
             }),
