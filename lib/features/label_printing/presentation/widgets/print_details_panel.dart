@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/printer/label_printer.dart';
 import '../../../../core/printer/printer_session_controller.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/status_badge.dart';
-import '../../../../shared/widgets/app_sidebar.dart';
-import '../../../printer_workspace/presentation/app_section_controller.dart';
-import '../../../template_selection/presentation/template_selection_screen.dart';
 import '../../domain/food_rotation_label_data.dart';
 import '../../domain/label_data.dart';
 import '../../domain/label_template.dart';
 import '../../domain/poke_bowl_pricing.dart';
 import '../label_print_controller.dart';
 import '../poke_bowl_pricing_controller.dart';
+import '../print_count_controller.dart';
 
 class PrintDetailsPanel extends ConsumerWidget {
   const PrintDetailsPanel({super.key});
@@ -25,6 +24,7 @@ class PrintDetailsPanel extends ConsumerWidget {
     final state = ref.watch(labelPrintControllerProvider);
     final controller = ref.read(labelPrintControllerProvider.notifier);
     final pricing = ref.watch(pokeBowlPricingProvider);
+    final printCount = ref.watch(printCountProvider);
 
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
 
@@ -55,6 +55,29 @@ class PrintDetailsPanel extends ConsumerWidget {
                   icon: const Icon(Icons.save_outlined),
                   tooltip: 'Save hours, employee & PH for this food',
                 ),
+              Tooltip(
+                message: 'Labels printed today',
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.today_outlined, size: 14, color: Colors.black54),
+                      const SizedBox(width: 6),
+                      Text(
+                        '$printCount',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               SizedBox(
                 width: 120,
                 child: ElevatedButton(
@@ -273,8 +296,7 @@ class PrintDetailsPanel extends ConsumerWidget {
               ),
               StatusBadge(status: session.status),
               IconButton(
-                onPressed: () =>
-                    ref.read(appSectionProvider.notifier).state = AppSection.settings,
+                onPressed: () => context.push('/settings'),
                 icon: const Icon(Icons.edit_outlined, size: 16),
                 tooltip: session.config == null ? 'Set up printer' : 'Edit printer settings',
                 visualDensity: VisualDensity.compact,
@@ -315,10 +337,7 @@ class PrintDetailsPanel extends ConsumerWidget {
   /// [LabelPrintController.startNewLabel] (run when a template is next
   /// confirmed) already guarantees no field values leak between templates.
   void _changeTemplate(BuildContext context) {
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const TemplateSelectionScreen()),
-    );
+    context.go('/templates');
   }
 }
 

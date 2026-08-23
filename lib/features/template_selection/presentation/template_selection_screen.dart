@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../shared/theme/app_theme.dart';
-import '../../food_selection/presentation/food_selection_screen.dart';
 import '../../label_printing/domain/custom_label_data.dart';
 import '../../label_printing/domain/food_rotation_label_data.dart';
 import '../../label_printing/domain/label_data.dart';
 import '../../label_printing/domain/label_template.dart';
 import '../../label_printing/presentation/label_print_controller.dart';
-import '../../printer_workspace/presentation/printer_workspace_screen.dart';
 import '../../template_builder/presentation/template_builder_controller.dart';
-import '../../template_builder/presentation/template_builder_screen.dart';
 import '../../template_builder/presentation/template_repository_controller.dart';
 import 'template_selection_controller.dart';
 import 'widgets/template_card.dart';
@@ -55,29 +53,21 @@ class _TemplateSelectionScreenState extends ConsumerState<TemplateSelectionScree
     ref.read(selectedLabelTemplateProvider.notifier).state = template;
 
     if (template.requiresFoodSelection) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const FoodSelectionScreen()),
-      );
+      context.push('/food-selection');
     } else {
       ref.read(labelPrintControllerProvider.notifier).startNewLabel(template);
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const PrinterWorkspaceScreen()),
-      );
+      context.push('/print');
     }
   }
 
   void _createTemplate() {
     ref.read(editingTemplateProvider.notifier).state = null;
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const TemplateBuilderScreen()),
-    );
+    context.push('/templates/builder');
   }
 
   void _editTemplate(LabelTemplate template) {
     ref.read(editingTemplateProvider.notifier).state = template;
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const TemplateBuilderScreen()),
-    );
+    context.push('/templates/builder');
   }
 
   Future<void> _duplicateTemplate(LabelTemplate template) async {
@@ -144,7 +134,7 @@ class _TemplateSelectionScreenState extends ConsumerState<TemplateSelectionScree
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: () => context.canPop() ? context.pop() : context.go('/'),
                     icon: const Icon(Icons.arrow_back),
                     tooltip: 'Back',
                   ),

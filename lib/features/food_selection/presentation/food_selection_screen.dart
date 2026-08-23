@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../shared/theme/app_theme.dart';
 import '../../label_printing/presentation/label_print_controller.dart';
-import '../../printer_workspace/presentation/printer_workspace_screen.dart';
 import '../../template_selection/presentation/template_selection_controller.dart';
 import '../domain/food_catalog.dart';
 import 'food_selection_controller.dart';
@@ -54,7 +54,7 @@ class FoodSelectionScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: () => context.canPop() ? context.pop() : context.go('/templates'),
                     icon: const Icon(Icons.arrow_back),
                     tooltip: 'Back',
                   ),
@@ -112,6 +112,7 @@ class FoodSelectionScreen extends ConsumerWidget {
                         return FoodCard(
                           name: food.name,
                           color: food.color,
+                          targetTemperature: food.targetTemperature,
                           onSelect: () => _selectFood(context, ref, food),
                           onRemove: () => _confirmRemoveFood(context, ref, food.name),
                         );
@@ -129,9 +130,7 @@ class FoodSelectionScreen extends ConsumerWidget {
     ref
         .read(labelPrintControllerProvider.notifier)
         .startNewLabel(template, foodName: food.name, food: food);
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const PrinterWorkspaceScreen()),
-    );
+    context.push('/print');
   }
 
   Future<void> _showAddFoodDialog(BuildContext context, WidgetRef ref) async {
@@ -141,9 +140,11 @@ class FoodSelectionScreen extends ConsumerWidget {
     // showDialog() resolves, so a controller disposed immediately after
     // would be used-after-dispose.
     var enteredName = '';
+    var enteredTargetTemperature = '';
     Color? selectedColor;
 
-    final result = await showDialog<({String name, Color? color})>(
+    final result =
+        await showDialog<({String name, Color? color, double? targetTemperature})>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -166,9 +167,27 @@ class FoodSelectionScreen extends ConsumerWidget {
                           : null,
                       onFieldSubmitted: (value) {
                         if (formKey.currentState!.validate()) {
-                          Navigator.of(dialogContext).pop((name: value.trim(), color: selectedColor));
+                          Navigator.of(dialogContext).pop((
+                            name: value.trim(),
+                            color: selectedColor,
+                            targetTemperature: double.tryParse(enteredTargetTemperature),
+                          ));
                         }
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        hintText: 'Target Temperature (optional)',
+                        suffixText: '°F',
+                      ),
+                      onChanged: (value) => enteredTargetTemperature = value,
+                      validator: (value) => (value != null &&
+                              value.trim().isNotEmpty &&
+                              double.tryParse(value) == null)
+                          ? 'Enter a valid number'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -214,8 +233,11 @@ class FoodSelectionScreen extends ConsumerWidget {
                 ElevatedButton(
                   onPressed: () {
                     if (formKey.currentState!.validate()) {
-                      Navigator.of(dialogContext)
-                          .pop((name: enteredName.trim(), color: selectedColor));
+                      Navigator.of(dialogContext).pop((
+                        name: enteredName.trim(),
+                        color: selectedColor,
+                        targetTemperature: double.tryParse(enteredTargetTemperature),
+                      ));
                     }
                   },
                   child: const Text('Add'),
@@ -229,8 +251,11 @@ class FoodSelectionScreen extends ConsumerWidget {
 
     if (result == null || result.name.isEmpty || !context.mounted) return;
 
-    final added =
-        await ref.read(foodCatalogProvider.notifier).addFood(result.name, color: result.color);
+    final added = await ref.read(foodCatalogProvider.notifier).addFood(
+          result.name,
+          color: result.color,
+          targetTemperature: result.targetTemperature,
+        );
     if (!added && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('"${result.name}" is already in the list.')),

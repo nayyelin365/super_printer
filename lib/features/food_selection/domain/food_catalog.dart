@@ -11,6 +11,7 @@ class FoodModel {
     this.employee,
     this.ph,
     this.color,
+    this.targetTemperature,
   });
 
   final String name;
@@ -23,11 +24,17 @@ class FoodModel {
   /// Null means uncategorized (card falls back to a neutral look).
   final Color? color;
 
+  /// Target storage/holding temperature in °F, set when the food was
+  /// added — optional, shown on the card when present (e.g. "Target
+  /// Tempt : 32°F").
+  final double? targetTemperature;
+
   FoodModel copyWith({
     int? Function()? useByHours,
     String? Function()? employee,
     String? Function()? ph,
     Color? Function()? color,
+    double? Function()? targetTemperature,
   }) {
     return FoodModel(
       name: name,
@@ -35,6 +42,8 @@ class FoodModel {
       employee: employee != null ? employee() : this.employee,
       ph: ph != null ? ph() : this.ph,
       color: color != null ? color() : this.color,
+      targetTemperature:
+          targetTemperature != null ? targetTemperature() : this.targetTemperature,
     );
   }
 
@@ -45,6 +54,7 @@ class FoodModel {
       employee: json['employee'] as String?,
       ph: json['ph'] as String?,
       color: json['color'] != null ? Color(json['color'] as int) : null,
+      targetTemperature: (json['targetTemperature'] as num?)?.toDouble(),
     );
   }
 
@@ -55,6 +65,7 @@ class FoodModel {
       if (employee != null) 'employee': employee,
       if (ph != null) 'ph': ph,
       if (color != null) 'color': color!.toARGB32(),
+      if (targetTemperature != null) 'targetTemperature': targetTemperature,
     };
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../shared/theme/app_theme.dart';
-import '../../template_selection/presentation/template_selection_screen.dart';
 
 /// Landing page shown before the printer workspace — matches the FlavorHub
 /// marketing-style splash in the reference design: dark navy background,
@@ -107,13 +107,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 32),
                         ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const TemplateSelectionScreen(),
-                              ),
-                            );
-                          },
+                          onPressed: () => context.push('/templates'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.amber,
                             foregroundColor: AppTheme.navyDark,

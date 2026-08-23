@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../shared/theme/app_theme.dart';
 import '../../label_printing/domain/custom_label_data.dart';
@@ -23,7 +24,7 @@ class TemplateBuilderScreen extends ConsumerWidget {
 
     ref.listen(templateBuilderControllerProvider, (previous, next) {
       if (next.saved && previous?.saved != true) {
-        Navigator.of(context).pop();
+        if (context.canPop()) context.pop();
       }
     });
 
@@ -42,7 +43,7 @@ class TemplateBuilderScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: () => context.pop(),
                     icon: const Icon(Icons.arrow_back),
                     tooltip: 'Back',
                   ),
@@ -52,7 +53,7 @@ class TemplateBuilderScreen extends ConsumerWidget {
                   ),
                   const Spacer(),
                   TextButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: () => context.pop(),
                     child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 8),

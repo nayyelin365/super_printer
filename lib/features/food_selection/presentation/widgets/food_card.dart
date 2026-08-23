@@ -9,6 +9,7 @@ class FoodCard extends StatelessWidget {
     required this.onSelect,
     required this.onRemove,
     this.color,
+    this.targetTemperature,
   });
 
   final String name;
@@ -20,6 +21,10 @@ class FoodCard extends StatelessWidget {
   /// category are easy to tell apart at a glance. Null falls back to a
   /// plain white card.
   final Color? color;
+
+  /// Optional target storage/holding temperature (°F) — shown as
+  /// "Target Tempt : 32°F" under the name when set.
+  final double? targetTemperature;
 
   @override
   Widget build(BuildContext context) {
@@ -52,14 +57,27 @@ class FoodCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: 16),
-                          child: Text(
-                            name,
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 16),
+                              child: Text(
+                                name,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (targetTemperature != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Target Tempt: ${targetTemperature!.toStringAsFixed(0)}°F',
+                                style: const TextStyle(fontSize: 10, color: Colors.black54),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 8),
                         SizedBox(

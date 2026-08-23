@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "965066458678",
+    "project_id": "smart-printer-aac97",
+    "storage_bucket": "smart-printer-aac97.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:965066458678:android:7d4bb039f0ef310091ba97",
+        "android_client_info": {
+          "package_name": "com.flavour_hub.superprinter.super_printer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_IJdLA52awfOxyGxQOQplZejh5yD-ivk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

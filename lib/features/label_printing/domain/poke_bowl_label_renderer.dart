@@ -142,7 +142,7 @@ class PokeBowlLabelRenderer extends LabelTemplateRenderer {
         ..strokeWidth = 2,
     );
 
-    return dividerY;
+    return dividerY; 
   }
 
   /// The itemized price list (selected base price + each extra, two per

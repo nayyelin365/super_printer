@@ -49,11 +49,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Barcode:'), findsNothing);
 
-    // Printer settings edit/close flow still works from the print page.
+    // Printer settings flow still works from the print page (now its own
+    // pushed route, not an overlay) — Back returns to the print page.
     await tester.tap(find.byTooltip('Set up printer'));
     await tester.pumpAndSettle();
     expect(find.text('Printer Settings'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.close));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.text('Printer Settings'), findsNothing);
 
@@ -160,7 +161,8 @@ void main() {
     await tester.tap(find.byTooltip('Add food'));
     await tester.pumpAndSettle();
     expect(find.text('Add Food'), findsOneWidget);
-    expect(find.byType(TextFormField), findsOneWidget);
+    // Name + optional Target Temperature fields.
+    expect(find.byType(TextFormField), findsNWidgets(2));
 
     await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
     await tester.pumpAndSettle();

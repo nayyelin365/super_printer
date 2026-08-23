@@ -14,6 +14,7 @@ import '../domain/label_data.dart';
 import '../domain/label_template.dart';
 import '../domain/label_template_renderer.dart';
 import '../domain/poke_bowl_pricing.dart';
+import 'print_count_controller.dart';
 
 class LabelPrintState {
   LabelPrintState({
@@ -434,7 +435,26 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
         copies: state.quantity,
       );
 
+      await _ref.read(printCountProvider.notifier).increment(state.quantity);
+
+      // Total Amount (base price + extras) is specific to this one sale —
+      // clear it after a successful print so the next label doesn't start
+      // pre-filled with the last customer's total.
+      final printedData = state.labelData;
+      final clearedData = printedData is PokeBowlLabelData
+          ? printedData.copyWith(
+              basePriceLabel: () => null,
+              basePriceAmount: () => null,
+              extraLines: const [],
+              totalAmount: 0,
+            )
+          : printedData;
+
       state = state.copyWith(
+        labelData: clearedData,
+        amountText: printedData is PokeBowlLabelData ? '' : state.amountText,
+        amountGeneration:
+            printedData is PokeBowlLabelData ? state.amountGeneration + 1 : state.amountGeneration,
         isPrinting: false,
         printedCount: state.quantity,
         resultMessage: () =>

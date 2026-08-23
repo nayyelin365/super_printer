@@ -32,15 +32,19 @@ class FoodCatalogController extends StateNotifier<List<FoodModel>> {
   /// (case-insensitive). Returns false without changing anything if it's a
   /// duplicate, so the UI can tell the user why nothing happened. [color]
   /// is the category color picked in the add-food dialog, shown as the
-  /// card's accent.
-  Future<bool> addFood(String name, {Color? color}) async {
+  /// card's accent; [targetTemperature] is the optional target
+  /// storage/holding temperature (°F).
+  Future<bool> addFood(String name, {Color? color, double? targetTemperature}) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return false;
     final alreadyExists =
         state.any((food) => food.name.toLowerCase() == trimmed.toLowerCase());
     if (alreadyExists) return false;
 
-    state = [...state, FoodModel(name: trimmed, color: color)];
+    state = [
+      ...state,
+      FoodModel(name: trimmed, color: color, targetTemperature: targetTemperature),
+    ];
     await _storage.save(state);
     return true;
   }
