@@ -168,6 +168,18 @@ class _LogSheetScreenState extends ConsumerState<LogSheetScreen> {
                     icon: const Icon(Icons.add),
                     tooltip: 'Add entry',
                   ),
+                  // Sushi Rice is the only log type with a guided SOP
+                  // (Soaking -> Cook & Rest -> Cool & Acidify -> pH Check
+                  // -> Ready to Use) — every other type only ever needs the
+                  // plain add-entry form above.
+                  if (widget.logType == LogType.sushiRice) ...[
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => context.push('/logs/sushiRice/dashboard'),
+                      icon: const Icon(Icons.timer_outlined, size: 18),
+                      label: const Text('Sushi Rice Preparation'),
+                    ),
+                  ],
                 ],
               ),
             ),

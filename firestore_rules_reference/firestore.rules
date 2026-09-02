@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Log Sheet feature
+    match /logs/{logId} {
+      allow read, write: if true;
+    }
+    match /log_locations/{locationId} {
+      allow read, write: if true;
+    }
+    match /log_counters/{dateKey} {
+      allow read, write: if true;
+    }
+
+    // Sushi Rice Preparation SOP
+    match /sushi_rice_batches/{batchId} {
+      allow read, write: if true;
+    }
+    match /sushi_rice_batch_counters/{year} {
+      allow read, write: if true;
+    }
+
+    // Shared staff/employee roster
+    match /employees/{employeeId} {
+      allow read, write: if true;
+    }
+
+    // Receiving Log feature (items live in a subcollection under each invoice)
+    match /receiving_invoices/{invoiceId} {
+      allow read, write: if true;
+
+      match /items/{itemId} {
+        allow read, write: if true;
+      }
+    }
+    match /receiving_item_counters/{prefix} {
+      allow read, write: if true;
+    }
+
+    // Required in addition to the nested match above: the app watches
+    // every invoice's items in one shot via a `collectionGroup('items')`
+    // query (receiving_log_controller.dart), and Firestore only honors
+    // collection-group reads against a rule written with the recursive
+    // `{path=**}` wildcard — the nested match above covers direct
+    // subcollection access but is NOT enough for the collection-group
+    // query on its own.
+    match /{path=**}/items/{itemId} {
+      allow read, write: if true;
+    }
+  }
+}

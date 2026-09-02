@@ -9,7 +9,14 @@ import '../../features/log_sheet/domain/log_type.dart';
 import '../../features/log_sheet/presentation/log_entry_form_screen.dart';
 import '../../features/log_sheet/presentation/log_home_screen.dart';
 import '../../features/log_sheet/presentation/log_sheet_screen.dart';
+import '../../features/log_sheet/presentation/sushi_rice_batch_detail_screen.dart';
+import '../../features/log_sheet/presentation/sushi_rice_dashboard_screen.dart';
+import '../../features/log_sheet/presentation/sushi_rice_new_batch_screen.dart';
+import '../../features/log_sheet/presentation/sushi_rice_ph_log_sheet_screen.dart';
 import '../../features/printer_settings/presentation/printer_settings_screen.dart';
+import '../../features/receiving_log/presentation/add_receiving_invoice_screen.dart';
+import '../../features/receiving_log/presentation/add_receiving_item_screen.dart';
+import '../../features/receiving_log/presentation/receiving_log_list_screen.dart';
 import '../../features/template_builder/presentation/template_builder_screen.dart';
 import '../../features/template_selection/presentation/template_selection_screen.dart';
 import '../widgets/app_shell.dart';
@@ -67,6 +74,36 @@ GoRouter createAppRouter() => GoRouter(
           path: '/logs/:logType/entry',
           builder: (context, state) =>
               LogEntryFormScreen(logType: LogType.values.byName(state.pathParameters['logType']!)),
+        ),
+        GoRoute(
+          path: '/logs/sushiRice/dashboard',
+          builder: (context, state) => const SushiRiceDashboardScreen(),
+        ),
+        GoRoute(
+          path: '/logs/sushiRice/new',
+          builder: (context, state) => const SushiRiceNewBatchScreen(),
+        ),
+        GoRoute(
+          path: '/logs/sushiRice/batch/:batchId',
+          builder: (context, state) =>
+              SushiRiceBatchDetailScreen(batchId: state.pathParameters['batchId']!),
+        ),
+        GoRoute(
+          path: '/logs/sushiRice/report',
+          builder: (context, state) => const SushiRicePhLogSheetScreen(),
+        ),
+        GoRoute(
+          path: '/receiving-log',
+          builder: (context, state) => const ReceivingLogListScreen(),
+        ),
+        GoRoute(
+          path: '/receiving-log/new',
+          builder: (context, state) => const AddReceivingInvoiceScreen(),
+        ),
+        GoRoute(
+          path: '/receiving-log/invoice/:invoiceId/new-item',
+          builder: (context, state) =>
+              AddReceivingItemScreen(invoiceId: state.pathParameters['invoiceId']!),
         ),
       ],
     ),

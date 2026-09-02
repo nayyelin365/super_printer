@@ -16,7 +16,13 @@ class AppShell extends StatelessWidget {
   AppSection get _selected {
     if (location.startsWith('/settings')) return AppSection.settings;
     if (location.startsWith('/alarms')) return AppSection.alarms;
+    if (location.startsWith('/logs/sushiRice/dashboard') ||
+        location.startsWith('/logs/sushiRice/new') ||
+        location.startsWith('/logs/sushiRice/batch')) {
+      return AppSection.sushiRice;
+    }
     if (location.startsWith('/logs')) return AppSection.logs;
+    if (location.startsWith('/receiving-log')) return AppSection.receivingLog;
     return AppSection.print;
   }
 
@@ -32,6 +38,8 @@ class AppShell extends StatelessWidget {
               // begins at template choice, not the print page itself.
               AppSection.print => '/templates',
               AppSection.logs => '/logs',
+              AppSection.sushiRice => '/logs/sushiRice/dashboard',
+              AppSection.receivingLog => '/receiving-log',
               AppSection.alarms => '/alarms',
               AppSection.settings => '/settings',
             }),
