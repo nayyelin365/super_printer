@@ -136,6 +136,17 @@ class _AddReceivingInvoiceScreenState extends ConsumerState<AddReceivingInvoiceS
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(56),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                textStyle: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
                               onPressed: _saving ? null : _save,
                               child: Text(
                                 _saving ? 'Saving...' : 'Save & Add Receiving Item',

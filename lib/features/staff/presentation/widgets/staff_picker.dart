@@ -34,6 +34,7 @@ class _StaffNamePickerState extends ConsumerState<StaffNamePicker> {
     final staffAsync = ref.watch(staffMembersProvider);
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Enter Your Name', style: TextStyle(fontSize: 12, color: Colors.black54)),

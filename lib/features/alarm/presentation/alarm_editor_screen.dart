@@ -45,6 +45,15 @@ class _AlarmEditorScreenState extends ConsumerState<AlarmEditorScreen> {
     _repeatDays = {...(editing?.repeatDays ?? const <int>{})};
     _soundId = editing?.soundId ?? defaultAlarmSoundId;
     _repeatSound = editing?.repeatSound ?? false;
+
+    // A new alarm starts pre-selected with whatever sound was last saved
+    // (see `AlarmStorage.loadDefaultSoundId`), not always "Default" — an
+    // editing alarm keeps its own already-set sound instead.
+    if (editing == null) {
+      ref.read(alarmStorageProvider).loadDefaultSoundId().then((soundId) {
+        if (mounted) setState(() => _soundId = soundId);
+      });
+    }
   }
 
   Future<void> _pickTime() async {
@@ -65,6 +74,7 @@ class _AlarmEditorScreenState extends ConsumerState<AlarmEditorScreen> {
     setState(() => _isSaving = true);
 
     final controller = ref.read(alarmControllerProvider.notifier);
+    await ref.read(alarmStorageProvider).saveDefaultSoundId(_soundId);
     final granted = await controller.ensurePermissions();
     if (!granted && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

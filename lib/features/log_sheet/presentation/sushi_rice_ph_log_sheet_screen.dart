@@ -7,17 +7,45 @@ import '../../../shared/theme/app_theme.dart';
 import '../domain/sushi_rice_batch.dart';
 import 'sushi_rice_batch_controller.dart';
 
-/// Routed at `/logs/sushiRice/report` — the "Sushi Rice pH Log Sheet": a
+/// Routed at `/logs/sushiRice/report` (every batch, side by side — with a
+/// search box to narrow that down to one) and `/logs/sushiRice/report/
+/// :batchId` (opens straight to one batch's own column, reached by tapping
+/// a batch card on the dashboard) — the "Sushi Rice pH Log Sheet": a
 /// structured HACCP compliance record (Stage 1–4 sections, pH critical
 /// limit, corrective action, holding/expiration, final status), one column
 /// per batch, sourced directly from [SushiRiceBatch] rather than the
 /// generic Log Sheet table — this is the actual audit record the SOP
 /// needs, not a summary row.
-class SushiRicePhLogSheetScreen extends ConsumerWidget {
-  const SushiRicePhLogSheetScreen({super.key});
+class SushiRicePhLogSheetScreen extends ConsumerStatefulWidget {
+  const SushiRicePhLogSheetScreen({super.key, this.batchId});
+
+  /// When set, the search box starts pre-filled with this batch's code —
+  /// how a batch card's "View Log Sheet" link opens straight to its own
+  /// record while still leaving the box editable to switch batches.
+  final String? batchId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SushiRicePhLogSheetScreen> createState() => _SushiRicePhLogSheetScreenState();
+}
+
+class _SushiRicePhLogSheetScreenState extends ConsumerState<SushiRicePhLogSheetScreen> {
+  late final TextEditingController _searchController;
+  String _search = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final batchesAsync = ref.watch(allSushiRiceBatchesProvider);
 
     return Scaffold(
@@ -48,17 +76,81 @@ class SushiRicePhLogSheetScreen extends ConsumerWidget {
             ),
             Expanded(
               child: batchesAsync.when(
-                data: (batches) => batches.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No batches recorded yet.',
-                          style: TextStyle(color: Colors.black45, fontSize: 14),
-                        ),
-                      )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: _LogSheetTable(batches: batches),
+                data: (allBatches) {
+                  // The pending-search version of the deep-linked batch's
+                  // code — set once, before the user's typed anything, so
+                  // opening from a batch card lands pre-filtered to it
+                  // without locking the box against picking a different one.
+                  if (_searchController.text.isEmpty && widget.batchId != null) {
+                    final linked = allBatches.where((b) => b.id == widget.batchId).firstOrNull;
+                    if (linked != null) {
+                      _search = linked.batchCode;
+                      _searchController.text = linked.batchCode;
+                    }
+                  }
+
+                  if (allBatches.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No batches recorded yet.',
+                        style: TextStyle(color: Colors.black45, fontSize: 14),
                       ),
+                    );
+                  }
+
+                  final query = _search.trim().toLowerCase();
+                  final batches = query.isEmpty
+                      ? allBatches
+                      : allBatches.where((b) => b.batchCode.toLowerCase().contains(query)).toList();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 320),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (value) => setState(() => _search = value),
+                            decoration: InputDecoration(
+                              hintText: 'Enter Batch... (leave blank for all)',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _search.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      icon: const Icon(Icons.close, size: 18),
+                                      onPressed: () => setState(() {
+                                        _search = '';
+                                        _searchController.clear();
+                                      }),
+                                    ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: AppTheme.border),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: batches.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No batch matches "$_search".',
+                                  style: const TextStyle(color: Colors.black45, fontSize: 14),
+                                ),
+                              )
+                            : SingleChildScrollView(
+                                padding: const EdgeInsets.all(20),
+                                child: _LogSheetTable(batches: batches),
+                              ),
+                      ),
+                    ],
+                  );
+                },
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, stackTrace) => Center(child: Text('Error: $error')),
               ),
@@ -88,7 +180,6 @@ final _sections = <_Section>[
   _Section('Stage 1: Preparation', [
     ('Rice Washing & Soaking Started', (b) => _fmtTime(b.soakStartedAt)),
     ('Staff', (b) => b.staffName ?? ''),
-    ('Soaking Method', (b) => b.soakingMethod ?? ''),
     ('Rice Cooking Started', (b) => _fmtTime(b.cookRestStartedAt)),
     ('Rice Cooking Finished', (b) => _fmtTime(b.mixCoolStartedAt)),
   ]),
@@ -198,6 +289,7 @@ class _LogSheetTable extends StatelessWidget {
 
   Widget _row({required String label, required List<String> values, bool header = false}) {
     return Container(
+      height: _rowHeight,
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppTheme.border)),
       ),

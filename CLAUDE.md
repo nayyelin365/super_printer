@@ -70,13 +70,18 @@ feature)
   than forcing a new `LabelData`/`LabelTemplate` into the existing
   template system — that system serves the manual print flow and
   shouldn't grow one-off cases.
-- **Notifications**: `flutter_local_notifications`, one plugin instance +
-  channel per feature that needs it (`alarm_notifications.dart`,
-  `sushi_rice_notifications.dart`) rather than a single shared one — each
-  feature's action set differs. Per-entity notification ids are derived
-  from a stable FNV-1a hash of the entity's Firestore doc id (see
-  `stableAlarmBaseId` / `_stableBatchBaseId`), not a counter, so ids for
-  different entities never collide without needing shared state.
+- **Notifications/alarms**: the app's one real notification channel is
+  `alarm_notifications.dart`, backing the Alarm feature
+  (`lib/features/alarm/`). A feature that needs a kitchen-timer-style
+  alert should create a real `Alarm` via `AlarmController.addAlarm` rather
+  than standing up its own notification channel — the Sushi Rice SOP does
+  exactly this (see `docs/sushi_rice_sop.md`'s "Alarm integration"
+  section) after an earlier version tried a separate bespoke channel and
+  was told to route through the Alarms tab instead. Per-alarm OS
+  notification ids are derived from a stable FNV-1a hash of the alarm's
+  own id (`stableAlarmBaseId`), not a counter — a feature scheduling
+  alarms programmatically doesn't need to think about notification ids at
+  all, just store the returned `Alarm.id` to cancel it later.
 
 ## Known incomplete/empty areas — don't assume from directory existence
 alone

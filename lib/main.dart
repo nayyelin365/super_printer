@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'features/alarm/data/alarm_notifications.dart';
-import 'features/log_sheet/data/sushi_rice_notifications.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -13,10 +12,9 @@ void main() async {
   // Sets up the notification plugin/channel/timezone before any alarm
   // could be scheduled — including the app-restart pass in
   // `AlarmController` that re-confirms every enabled alarm's schedule.
+  // The Sushi Rice SOP's buzzers/TPHC alerts are real Alarms scheduled
+  // through this same system (see `SushiRiceBatchController`), not a
+  // separate notification channel — no second init call needed.
   await initializeAlarmNotifications();
-  // Relies on the timezone setup `initializeAlarmNotifications` just did
-  // (the `timezone` package's local location is process-global) — safe to
-  // call after it, not before.
-  await initializeSushiRiceNotifications();
   runApp(const ProviderScope(child: SuperPrinterApp()));
 }

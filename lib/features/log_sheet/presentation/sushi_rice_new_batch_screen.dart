@@ -5,11 +5,9 @@ import 'package:intl/intl.dart';
 
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/utils/network_error.dart';
-import '../../food_selection/presentation/food_selection_controller.dart';
 import '../../staff/presentation/staff_controller.dart';
 import '../../staff/presentation/widgets/staff_picker.dart';
 import '../domain/sushi_rice_batch.dart';
-import 'log_controller.dart';
 import 'sushi_rice_batch_controller.dart';
 
 /// Routed at `/logs/sushiRice/new` — "New Preparation Rice Batch": choose
@@ -30,15 +28,24 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
   bool _ricePotSanitized = false;
   bool _riceInspectedWashed = false;
   bool _enzymeAdded = false;
-  String _soakingMethod = sushiRiceSoakingMethods.first;
+  bool _riceWeightConfirmed = false;
   String? _staffId;
   String? _staffName;
-  String? _foodName;
-  String? _locationId;
-  String? _locationName;
   bool _saving = false;
 
   static const _weightOptions = [3.0, 6.0, 10.0];
+
+  /// Shared sizing so every Back/Next/Continue/Save button across all
+  /// three steps ends up the same height and width (via `Expanded`
+  /// siblings sharing this style) instead of drifting per-step.
+  ButtonStyle _stepButtonStyle(Color backgroundColor) => ElevatedButton.styleFrom(
+    backgroundColor: backgroundColor,
+    foregroundColor: Colors.white,
+    minimumSize: const Size.fromHeight(56),
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +148,7 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
+              style: _stepButtonStyle(AppTheme.navyDark),
               onPressed: () => setState(() => _step = 1),
               child: const Text('NEXT →'),
             ),
@@ -166,52 +174,36 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
             'Please check the following steps are done',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 8),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            title: const Text('Rice Pot Sanitized'),
-            value: _ricePotSanitized,
-            onChanged: (value) => setState(() => _ricePotSanitized = value ?? false),
+          const SizedBox(height: 10),
+          _ChecklistRow(
+            label: 'Rice Pot Sanitized',
+            checked: _ricePotSanitized,
+            onChanged: (value) => setState(() => _ricePotSanitized = value),
           ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            title: const Text('Rice Inspected & Washed'),
-            value: _riceInspectedWashed,
-            onChanged: (value) => setState(() => _riceInspectedWashed = value ?? false),
+          const SizedBox(height: 10),
+          _ChecklistRow(
+            label: 'Rice Inspected & Washed',
+            checked: _riceInspectedWashed,
+            onChanged: (value) => setState(() => _riceInspectedWashed = value),
           ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.check_circle_outline, color: Colors.black38),
-            title: Text('Checked Rice Weight Total ${totalLbs.toStringAsFixed(1)} Lbs'),
+          const SizedBox(height: 10),
+          _ChecklistRow(
+            label: 'Checked Rice Weight Total ${totalLbs.toStringAsFixed(1)} Lbs',
+            checked: _riceWeightConfirmed,
+            onChanged: (value) => setState(() => _riceWeightConfirmed = value),
           ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            title: const Text('Enzyme Added (Optional)'),
-            value: _enzymeAdded,
-            onChanged: (value) => setState(() => _enzymeAdded = value ?? false),
-          ),
-          const SizedBox(height: 12),
-          const Text('Soaking Method', style: TextStyle(fontSize: 12, color: Colors.black54)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final method in sushiRiceSoakingMethods)
-                ChoiceChip(
-                  label: Text(method),
-                  selected: _soakingMethod == method,
-                  onSelected: (_) => setState(() => _soakingMethod = method),
-                ),
-            ],
+          const SizedBox(height: 10),
+          _ChecklistRow(
+            label: 'Enzyme Added (Optional)',
+            checked: _enzymeAdded,
+            onChanged: (value) => setState(() => _enzymeAdded = value),
           ),
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: ElevatedButton(
+                  style: _stepButtonStyle(AppTheme.navyDark),
                   onPressed: () => setState(() => _step = 0),
                   child: const Text('← BACK'),
                 ),
@@ -219,7 +211,8 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _ricePotSanitized && _riceInspectedWashed
+                  style: _stepButtonStyle(AppTheme.navyDark),
+                  onPressed: _ricePotSanitized && _riceInspectedWashed && _riceWeightConfirmed
                       ? () => setState(() => _step = 2)
                       : null,
                   child: const Text('CONTINUE →'),
@@ -233,9 +226,6 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
   }
 
   Widget _buildStaffStep() {
-    final foods = ref.watch(foodCatalogProvider);
-    final locationsAsync = ref.watch(logLocationsProvider);
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -257,51 +247,6 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
             },
           ),
           const SizedBox(height: 16),
-          const Text('Food', style: TextStyle(fontSize: 12, color: Colors.black54)),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<String>(
-            initialValue: _foodName,
-            isExpanded: true,
-            decoration: const InputDecoration(hintText: 'Select the sushi rice item'),
-            items: [
-              for (final food in foods)
-                DropdownMenuItem(
-                  value: food.name,
-                  child: Text(food.name, overflow: TextOverflow.ellipsis),
-                ),
-            ],
-            onChanged: (value) => setState(() => _foodName = value),
-          ),
-          const SizedBox(height: 16),
-          const Text('Unit Name / Location', style: TextStyle(fontSize: 12, color: Colors.black54)),
-          const SizedBox(height: 6),
-          locationsAsync.when(
-            data: (locations) => DropdownButtonFormField<String>(
-              initialValue: _locationId,
-              isExpanded: true,
-              decoration: const InputDecoration(hintText: 'Select a location'),
-              items: [
-                for (final location in locations)
-                  DropdownMenuItem(
-                    value: location.id,
-                    child: Text(location.name, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: (id) {
-                final location = locations.firstWhere((l) => l.id == id);
-                setState(() {
-                  _locationId = location.id;
-                  _locationName = location.name;
-                });
-              },
-            ),
-            loading: () => const LinearProgressIndicator(),
-            error: (error, stackTrace) => const Text(
-              'Could not load locations.',
-              style: TextStyle(color: AppTheme.danger, fontSize: 12),
-            ),
-          ),
-          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -320,7 +265,8 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: ElevatedButton(
+                  style: _stepButtonStyle(AppTheme.navyDark),
                   onPressed: () => setState(() => _step = 1),
                   child: const Text('← BACK'),
                 ),
@@ -328,7 +274,7 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+                  style: _stepButtonStyle(AppTheme.success),
                   onPressed: _saving ? null : _save,
                   child: Text(_saving ? 'SAVING...' : 'SAVE & PRINT'),
                 ),
@@ -347,12 +293,6 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
       ).showSnackBar(const SnackBar(content: Text('Enter or select who is starting this batch.')));
       return;
     }
-    if (_foodName == null || _locationId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Select a food and a location.')));
-      return;
-    }
     if (!await hasNetworkConnection()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -368,14 +308,20 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
             ricePotSanitized: _ricePotSanitized,
             riceInspectedWashed: _riceInspectedWashed,
             enzymeAdded: _enzymeAdded,
-            soakingMethod: _soakingMethod,
             staffId: _staffId!,
             staffName: _staffName!,
-            foodName: _foodName!,
-            locationId: _locationId!,
-            locationName: _locationName!,
           );
       if (!mounted) return;
+      if (!result.alarmPermissionGranted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Notifications are disabled for this app, so this batch\'s buzzer alarms may '
+              'not go off. Enable notifications in system settings.',
+            ),
+          ),
+        );
+      }
       if (!result.labelPrinted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result.printError ?? 'Could not print the label.')),
@@ -390,6 +336,51 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+}
+
+/// A full-width checklist row: label + a square checkbox icon on the
+/// trailing edge, highlighting green (background/border/icon) once
+/// checked. Every row here is a real toggle — [onChanged] is only ever
+/// null for a row this screen deliberately wants to render disabled.
+class _ChecklistRow extends StatelessWidget {
+  const _ChecklistRow({required this.label, required this.checked, required this.onChanged});
+
+  final String label;
+  final bool checked;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onChanged != null;
+    return InkWell(
+      onTap: enabled ? () => onChanged!(!checked) : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: checked ? AppTheme.success.withValues(alpha: 0.1) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: checked ? AppTheme.success : AppTheme.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(color: enabled ? Colors.black87 : Colors.black54),
+              ),
+            ),
+            Icon(
+              checked ? Icons.check_box : Icons.check_box_outline_blank,
+              size: 22,
+              color: checked ? AppTheme.success : Colors.black26,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

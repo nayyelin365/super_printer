@@ -71,6 +71,15 @@ class AppTheme {
           side: const BorderSide(color: border),
         ),
       ),
+      // Plain white, matching every other card/surface in the app —
+      // without this, Material 3's `ColorScheme.fromSeed(seedColor: amber)`
+      // tints every AlertDialog's background an odd cream/peach.
+      dialogTheme: const DialogThemeData(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
     );
   }
 }

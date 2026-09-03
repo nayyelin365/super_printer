@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../alarm/presentation/alarm_controller.dart';
 import '../data/sushi_rice_batch_repository.dart';
 import '../data/sushi_rice_label_printer.dart';
-import '../data/sushi_rice_notifications.dart';
 import '../domain/sushi_rice_batch.dart';
 
 final sushiRiceBatchRepositoryProvider = Provider<SushiRiceBatchRepository>(
@@ -28,10 +28,22 @@ final sushiRiceBatchProvider = StreamProvider.family<SushiRiceBatch?, String>((r
 });
 
 class SushiRiceStartResult {
-  const SushiRiceStartResult({required this.batch, required this.labelPrinted, this.printError});
+  const SushiRiceStartResult({
+    required this.batch,
+    required this.labelPrinted,
+    this.printError,
+    this.alarmPermissionGranted = true,
+  });
   final SushiRiceBatch batch;
   final bool labelPrinted;
   final String? printError;
+
+  /// False if the OS denied notification/exact-alarm permission when the
+  /// Soaking buzzer was scheduled — the caller should warn that this
+  /// batch's alerts may not fire, same as the plain Alarm editor does.
+  /// Only checked once, at batch creation: permission granted for the
+  /// first alarm stays granted for the rest of the batch's alarms.
+  final bool alarmPermissionGranted;
 }
 
 /// Outcome of [SushiRiceBatchController.submitPhReading] — the screen
@@ -46,6 +58,31 @@ class SushiRiceBatchController {
 
   SushiRiceBatchRepository get _repository => _ref.read(sushiRiceBatchRepositoryProvider);
 
+  /// Every "... Time's Up!" buzzer and TPHC compliance alert this SOP
+  /// raises is a real entry in the app's existing Alarm system (the same
+  /// one the Alarms tab shows and rings) rather than a separate
+  /// notification channel — so a batch's pending alerts are always
+  /// visible there too, and get the Alarm feature's own reliability
+  /// (proper alarm audio stream, full-screen intent, Dismiss/Snooze).
+  Future<String> _scheduleAlarm({required DateTime at, required String title}) async {
+    final alarm = await _ref
+        .read(alarmControllerProvider.notifier)
+        .addAlarm(hour: at.hour, minute: at.minute, title: title, repeatSound: true);
+    return alarm.id;
+  }
+
+  /// Requests notification/exact-alarm permission — same call the plain
+  /// Alarm editor makes before its first `addAlarm`. Idempotent (a no-op
+  /// once already granted), so it's safe to call again on every batch even
+  /// though the caller only actually surfaces the result at creation time.
+  Future<bool> _ensureAlarmPermissions() =>
+      _ref.read(alarmControllerProvider.notifier).ensurePermissions();
+
+  Future<void> _cancelAlarm(String? alarmId) async {
+    if (alarmId == null) return;
+    await _ref.read(alarmControllerProvider.notifier).deleteAlarm(alarmId);
+  }
+
   /// Creates the batch, then immediately attempts "Save & Print" — the
   /// label prints at batch creation (Soaking start), not after a later
   /// verification step. Printer failures don't block starting the batch;
@@ -57,13 +94,14 @@ class SushiRiceBatchController {
     required bool ricePotSanitized,
     required bool riceInspectedWashed,
     required bool enzymeAdded,
-    required String soakingMethod,
     required String staffId,
     required String staffName,
-    required String foodName,
-    required String locationId,
-    required String locationName,
+    String? foodName,
+    String? locationId,
+    String? locationName,
   }) async {
+    final permissionGranted = await _ensureAlarmPermissions();
+
     final now = DateTime.now();
     var batch = await _repository.create(
       SushiRiceBatch(
@@ -74,7 +112,6 @@ class SushiRiceBatchController {
         ricePotSanitized: ricePotSanitized,
         riceInspectedWashed: riceInspectedWashed,
         enzymeAdded: enzymeAdded,
-        soakingMethod: soakingMethod,
         soakMinutes: sushiRiceSoakTotalMinutes,
         soakStartedAt: now,
         staffId: staffId,
@@ -85,13 +122,12 @@ class SushiRiceBatchController {
       ),
     );
 
-    await scheduleStageDoneAlert(
-      batchId: batch.id,
-      stage: SushiRiceStage.soaking,
-      title: "Soaking Time's Up!",
-      body: 'Sushi Rice soaking time has finished. Please proceed to the next step.',
+    final alarmId = await _scheduleAlarm(
       at: now.add(const Duration(minutes: sushiRiceSoakTotalMinutes)),
+      title: '${batch.batchCode} — Start Cooking',
     );
+    batch = batch.copyWith(currentStageAlarmId: () => alarmId);
+    await _repository.update(batch);
 
     final printResult = await printSushiRiceBatchLabel(
       _ref,
@@ -110,6 +146,7 @@ class SushiRiceBatchController {
       batch: batch,
       labelPrinted: printResult.success,
       printError: printResult.errorMessage,
+      alarmPermissionGranted: permissionGranted,
     );
   }
 
@@ -142,8 +179,12 @@ class SushiRiceBatchController {
     required String staffId,
     required String staffName,
   }) async {
-    await cancelStageDoneAlert(batch.id, SushiRiceStage.soaking);
+    await _cancelAlarm(batch.currentStageAlarmId);
     final now = DateTime.now();
+    final alarmId = await _scheduleAlarm(
+      at: now.add(const Duration(minutes: sushiRiceCookRestTotalMinutes)),
+      title: '${batch.batchCode} — Mix Seasoning Vinegar',
+    );
     await _repository.update(
       batch.copyWith(
         stage: SushiRiceStage.cookingRest,
@@ -151,14 +192,8 @@ class SushiRiceBatchController {
         cookRestStartedAt: () => now,
         cookRestStaffId: () => staffId,
         cookRestStaffName: () => staffName,
+        currentStageAlarmId: () => alarmId,
       ),
-    );
-    await scheduleStageDoneAlert(
-      batchId: batch.id,
-      stage: SushiRiceStage.cookingRest,
-      title: "Cooking & Rest Time's Up!",
-      body: 'Cook & Rest has finished. Please mix seasoning vinegar and cool the rice.',
-      at: now.add(const Duration(minutes: sushiRiceCookRestTotalMinutes)),
     );
   }
 
@@ -171,8 +206,12 @@ class SushiRiceBatchController {
     required String staffId,
     required String staffName,
   }) async {
-    await cancelStageDoneAlert(batch.id, SushiRiceStage.cookingRest);
+    await _cancelAlarm(batch.currentStageAlarmId);
     final now = DateTime.now();
+    final alarmId = await _scheduleAlarm(
+      at: now.add(const Duration(minutes: sushiRiceMixCoolTotalMinutes)),
+      title: '${batch.batchCode} — Test pH Level',
+    );
     await _repository.update(
       batch.copyWith(
         stage: SushiRiceStage.mixingCooling,
@@ -181,30 +220,26 @@ class SushiRiceBatchController {
         mixCoolStartedAt: () => now,
         mixCoolStaffId: () => staffId,
         mixCoolStaffName: () => staffName,
+        currentStageAlarmId: () => alarmId,
       ),
-    );
-    await scheduleStageDoneAlert(
-      batchId: batch.id,
-      stage: SushiRiceStage.mixingCooling,
-      title: "Mixing & Cooling Time's Up!",
-      body: 'Mixing & Cooling has finished. Please measure the pH level.',
-      at: now.add(const Duration(minutes: sushiRiceMixCoolTotalMinutes)),
     );
   }
 
   /// Confirms "Measure pH Level" — staff chosen again, moving the batch
-  /// into pH Check.
+  /// into pH Check (no timer of its own, so no new alarm — just cancels
+  /// Mixing & Cooling's).
   Future<void> startPhCheck(
     SushiRiceBatch batch, {
     required String staffId,
     required String staffName,
   }) async {
-    await cancelStageDoneAlert(batch.id, SushiRiceStage.mixingCooling);
+    await _cancelAlarm(batch.currentStageAlarmId);
     await _repository.update(
       batch.copyWith(
         stage: SushiRiceStage.phCheck,
         phCheckStaffId: () => staffId,
         phCheckStaffName: () => staffName,
+        currentStageAlarmId: () => null,
       ),
     );
   }
@@ -259,23 +294,41 @@ class SushiRiceBatchController {
     );
     if (!printResult.success) return PhOutcome.passedButPrintFailed;
 
+    // One real Alarm per TPHC hour mark. Each keeps re-alerting until
+    // dismissed (`repeatSound: true`) — the closest honest match to "buzz
+    // every 5 minutes until Acknowledge" this app's notification layer
+    // can actually do without native platform code (see the Alarm
+    // feature's own documented "repeat sound" limitation); "Acknowledge"
+    // in the TPHC screen deletes the alarm outright.
+    final alarmIds = <String>[];
+    for (final hour in sushiRiceTphcAlertHours) {
+      final id = await _scheduleAlarm(
+        at: now.add(Duration(hours: hour)),
+        title: '${batch.batchCode} — TPHC Check ($hour hr)',
+      );
+      alarmIds.add(id);
+    }
+
     final withLabel = batch.copyWith(
       labelPrinted: true,
       stage: SushiRiceStage.readyToUse,
       readyToUseStartedAt: () => now,
+      tphcAlarmIds: alarmIds,
     );
     await _repository.update(withLabel);
-    await scheduleTphcAlerts(batch.id, now);
     return PhOutcome.passedAndLabelPrinted;
   }
 
   Future<void> acknowledgeHour(SushiRiceBatch batch, int hourIndex) async {
     final hour = sushiRiceTphcAlertHours[hourIndex];
+    if (hourIndex < batch.tphcAlarmIds.length) {
+      await _cancelAlarm(batch.tphcAlarmIds[hourIndex]);
+    }
     await _repository.update(batch.copyWith(lastAcknowledgedHour: () => hour));
   }
 
   /// "Finish Batch" — records the final outcome (Used/Discarded/Expired)
-  /// and who recorded it, cancels every pending alert, and excludes the
+  /// and who recorded it, cancels every pending alarm, and excludes the
   /// batch from the active dashboard (it still appears on the HACCP log
   /// sheet report).
   Future<void> setFinalBatchStatus(
@@ -284,8 +337,10 @@ class SushiRiceBatchController {
     required String staffId,
     required String staffName,
   }) async {
-    await cancelAllStageAlerts(batch.id);
-    await cancelTphcAlerts(batch.id);
+    await _cancelAlarm(batch.currentStageAlarmId);
+    for (final alarmId in batch.tphcAlarmIds) {
+      await _cancelAlarm(alarmId);
+    }
     await _repository.update(
       batch.copyWith(
         finalBatchStatus: () => status,

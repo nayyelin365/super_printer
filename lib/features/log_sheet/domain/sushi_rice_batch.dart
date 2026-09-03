@@ -33,9 +33,6 @@ const sushiRiceMixCoolTotalMinutes = 35;
 /// Cooling.
 const sushiRiceVinegarAmountsOz = [4.0, 8.0, 12.0];
 
-/// Soaking methods offered on the Soaking setup screen.
-const sushiRiceSoakingMethods = ['Room Temp', 'Refrigerator'];
-
 /// How long a batch may sit in Ready to Use (TPHC — Time/Temperature
 /// Control for Safety) before it must be discarded.
 const sushiRiceReadyToUseWindowHours = 24;
@@ -67,7 +64,6 @@ class SushiRiceBatch {
     this.ricePotSanitized = false,
     this.riceInspectedWashed = false,
     this.enzymeAdded = false,
-    this.soakingMethod,
     this.soakMinutes,
     this.soakStartedAt,
     this.staffId,
@@ -91,6 +87,8 @@ class SushiRiceBatch {
     this.labelPrinted = false,
     this.readyToUseStartedAt,
     this.lastAcknowledgedHour,
+    this.currentStageAlarmId,
+    this.tphcAlarmIds = const [],
     this.finalBatchStatus,
     this.finalStatusStaffId,
     this.finalStatusStaffName,
@@ -115,8 +113,6 @@ class SushiRiceBatch {
   final bool riceInspectedWashed;
   final bool enzymeAdded;
 
-  /// "Room Temp" or "Refrigerator" — chosen on the Soaking setup screen.
-  final String? soakingMethod;
 
   final int? soakMinutes;
   final DateTime? soakStartedAt;
@@ -171,6 +167,19 @@ class SushiRiceBatch {
   /// null if none yet.
   final int? lastAcknowledgedHour;
 
+  /// The real Alarm-feature alarm id for whatever "... Time's Up!" buzzer
+  /// is currently pending for this batch's Soaking/Cooking & Rest/Mixing &
+  /// Cooling stage — every automatic alert this SOP raises goes through
+  /// the same Alarm system the Alarms tab shows/rings, not a bespoke
+  /// notification channel. Cancelled and replaced on every stage
+  /// transition; see `SushiRiceBatchController`.
+  final String? currentStageAlarmId;
+
+  /// The Alarm ids for the five TPHC hour-mark alerts (see
+  /// [sushiRiceTphcAlertHours]), same index order — cancelled individually
+  /// as each is acknowledged, and in bulk on Finish Batch.
+  final List<String> tphcAlarmIds;
+
   /// "Stage 4: End of Batch Record" — set on Finish Batch.
   final String? finalBatchStatus;
   final String? finalStatusStaffId;
@@ -211,7 +220,6 @@ class SushiRiceBatch {
     bool? ricePotSanitized,
     bool? riceInspectedWashed,
     bool? enzymeAdded,
-    String? Function()? soakingMethod,
     int? Function()? soakMinutes,
     DateTime? Function()? soakStartedAt,
     String? Function()? staffId,
@@ -235,6 +243,8 @@ class SushiRiceBatch {
     bool? labelPrinted,
     DateTime? Function()? readyToUseStartedAt,
     int? Function()? lastAcknowledgedHour,
+    String? Function()? currentStageAlarmId,
+    List<String>? tphcAlarmIds,
     String? Function()? finalBatchStatus,
     String? Function()? finalStatusStaffId,
     String? Function()? finalStatusStaffName,
@@ -251,7 +261,6 @@ class SushiRiceBatch {
       ricePotSanitized: ricePotSanitized ?? this.ricePotSanitized,
       riceInspectedWashed: riceInspectedWashed ?? this.riceInspectedWashed,
       enzymeAdded: enzymeAdded ?? this.enzymeAdded,
-      soakingMethod: soakingMethod != null ? soakingMethod() : this.soakingMethod,
       soakMinutes: soakMinutes != null ? soakMinutes() : this.soakMinutes,
       soakStartedAt: soakStartedAt != null ? soakStartedAt() : this.soakStartedAt,
       staffId: staffId != null ? staffId() : this.staffId,
@@ -278,6 +287,9 @@ class SushiRiceBatch {
           readyToUseStartedAt != null ? readyToUseStartedAt() : this.readyToUseStartedAt,
       lastAcknowledgedHour:
           lastAcknowledgedHour != null ? lastAcknowledgedHour() : this.lastAcknowledgedHour,
+      currentStageAlarmId:
+          currentStageAlarmId != null ? currentStageAlarmId() : this.currentStageAlarmId,
+      tphcAlarmIds: tphcAlarmIds ?? this.tphcAlarmIds,
       finalBatchStatus: finalBatchStatus != null ? finalBatchStatus() : this.finalBatchStatus,
       finalStatusStaffId: finalStatusStaffId != null ? finalStatusStaffId() : this.finalStatusStaffId,
       finalStatusStaffName:
@@ -301,7 +313,6 @@ class SushiRiceBatch {
       ricePotSanitized: data['ricePotSanitized'] as bool? ?? false,
       riceInspectedWashed: data['riceInspectedWashed'] as bool? ?? false,
       enzymeAdded: data['enzymeAdded'] as bool? ?? false,
-      soakingMethod: data['soakingMethod'] as String?,
       soakMinutes: data['soakMinutes'] as int?,
       soakStartedAt: parseDate('soakStartedAtMillis'),
       staffId: data['staffId'] as String?,
@@ -325,6 +336,8 @@ class SushiRiceBatch {
       labelPrinted: data['labelPrinted'] as bool? ?? false,
       readyToUseStartedAt: parseDate('readyToUseStartedAtMillis'),
       lastAcknowledgedHour: data['lastAcknowledgedHour'] as int?,
+      currentStageAlarmId: data['currentStageAlarmId'] as String?,
+      tphcAlarmIds: (data['tphcAlarmIds'] as List<dynamic>?)?.cast<String>() ?? const [],
       finalBatchStatus: data['finalBatchStatus'] as String?,
       finalStatusStaffId: data['finalStatusStaffId'] as String?,
       finalStatusStaffName: data['finalStatusStaffName'] as String?,
@@ -343,7 +356,6 @@ class SushiRiceBatch {
       'ricePotSanitized': ricePotSanitized,
       'riceInspectedWashed': riceInspectedWashed,
       'enzymeAdded': enzymeAdded,
-      if (soakingMethod != null) 'soakingMethod': soakingMethod,
       if (soakMinutes != null) 'soakMinutes': soakMinutes,
       if (soakStartedAt != null) 'soakStartedAtMillis': soakStartedAt!.millisecondsSinceEpoch,
       if (staffId != null) 'staffId': staffId,
@@ -371,6 +383,8 @@ class SushiRiceBatch {
       if (readyToUseStartedAt != null)
         'readyToUseStartedAtMillis': readyToUseStartedAt!.millisecondsSinceEpoch,
       if (lastAcknowledgedHour != null) 'lastAcknowledgedHour': lastAcknowledgedHour,
+      if (currentStageAlarmId != null) 'currentStageAlarmId': currentStageAlarmId,
+      'tphcAlarmIds': tphcAlarmIds,
       if (finalBatchStatus != null) 'finalBatchStatus': finalBatchStatus,
       if (finalStatusStaffId != null) 'finalStatusStaffId': finalStatusStaffId,
       if (finalStatusStaffName != null) 'finalStatusStaffName': finalStatusStaffName,

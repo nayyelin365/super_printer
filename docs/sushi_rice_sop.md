@@ -27,8 +27,7 @@ window.
 | Domain model, all constants/thresholds | `lib/features/log_sheet/domain/sushi_rice_batch.dart` |
 | Firestore CRUD (`sushi_rice_batches` collection) | `lib/features/log_sheet/data/sushi_rice_batch_repository.dart` |
 | Label printing (2 distinct labels — see below) | `lib/features/log_sheet/data/sushi_rice_label_printer.dart` |
-| OS notifications (step alerts + TPHC hourly) | `lib/features/log_sheet/data/sushi_rice_notifications.dart` |
-| Business logic / state transitions | `lib/features/log_sheet/presentation/sushi_rice_batch_controller.dart` |
+| Business logic / state transitions / **Alarm integration** | `lib/features/log_sheet/presentation/sushi_rice_batch_controller.dart` |
 | Dashboard (5 stage cards + batch list) | `lib/features/log_sheet/presentation/sushi_rice_dashboard_screen.dart` |
 | "New Preparation Rice Batch" wizard | `lib/features/log_sheet/presentation/sushi_rice_new_batch_screen.dart` |
 | Per-batch detail screen (all 5 stage UIs) | `lib/features/log_sheet/presentation/sushi_rice_batch_detail_screen.dart` |
@@ -47,8 +46,9 @@ Routes (all under the app's `ShellRoute`, sidebar icon = `Icons.soup_kitchen_out
 This is **not** "staff picks a duration in a range." Each stage is a fixed
 total countdown; its "start next step" button is disabled for the first N
 minutes (the SOP's minimum), then enabled for the rest of the window. If the
-button still isn't tapped when the countdown hits zero, an OS notification
-("... Time's Up!") fires — with sound, even if the app is backgrounded/killed.
+button still isn't tapped when the countdown hits zero, a **real Alarm**
+fires (see "Alarm integration" below) — with sound, even if the app is
+backgrounded/killed, and visible in the app's own Alarms tab while pending.
 
 | Stage | Unlock at | Total (buzzer fires) |
 |---|---|---|
@@ -128,23 +128,58 @@ merged in).
 
 24-hour window (`sushiRiceReadyToUseWindowHours`) starting when the TPHC
 label prints. Compliance alerts fire at hours 20/21/22/23/24
-(`sushiRiceTphcAlertHours`), each followed by a real 5-minute reminder
-notification (`sushiRiceTphcReminderInterval`) until acknowledged — these
-are **individually scheduled one-shot notifications**, not
-`periodicallyShowWithDuration` (that API can't be deferred to start at a
-future anchor time, only from "now" — a real bug caught and fixed earlier).
-
-Acknowledging a notification's action button runs on a background isolate
-with no Riverpod access — it goes straight through
-`FirebaseFirestore.instance` after best-effort re-initializing Firebase
-(`_ensureFirebaseReady` in `sushi_rice_notifications.dart`). This is
-deliberately best-effort: if it fails, the notification still gets
-cancelled (the part that matters for stopping the nagging); only the
-dashboard's "needs acknowledgement" banner might lag until reopened.
+(`sushiRiceTphcAlertHours`), one real Alarm each — see "Alarm integration"
+below for why these are Alarms, not a bespoke notification.
 
 **Finish Batch** opens a dialog to record `finalBatchStatus`
 (`sushiRiceFinalStatuses` = Used/Discarded/Expired) + staff, before
-actually closing the batch out.
+actually closing the batch out (and cancelling any alarms still pending).
+
+## Alarm integration — every buzzer is a real Alarm, not a separate channel
+
+**This reverses an earlier design decision** (a bespoke
+`sushi_rice_notifications.dart` notification channel, since deleted) — the
+user explicitly asked for every automatic SOP alert to show up in, and
+fire through, the app's existing Alarm feature (`lib/features/alarm/`,
+the Alarms tab). If you're reading old context that mentions a separate
+Sushi Rice notification channel, that's stale; it no longer exists.
+
+How it works — all in `SushiRiceBatchController`:
+
+- `_scheduleAlarm({at, title})` calls the real
+  `AlarmController.addAlarm(hour:, minute:, title:, repeatSound: true)` —
+  the exact same method the Alarm editor screen uses — and returns the
+  created alarm's id.
+- `_cancelAlarm(alarmId)` calls `AlarmController.deleteAlarm`.
+- `SushiRiceBatch.currentStageAlarmId` holds the one pending "... Time's
+  Up!" alarm for whichever of Soaking/Cooking & Rest/Mixing & Cooling is
+  active — cancelled and replaced on every stage transition
+  (`startCooking`, `startMixing`, `startPhCheck`).
+- `SushiRiceBatch.tphcAlarmIds` holds all five TPHC hour-mark alarm ids,
+  created together in `_printTphcLabelAndStartReadyToUse` right after the
+  compliance label prints. `acknowledgeHour` cancels that specific hour's
+  alarm (in addition to recording `lastAcknowledgedHour`); `setFinalBatchStatus`
+  cancels whatever's left (current-stage alarm plus any un-acknowledged
+  TPHC alarms) so Finish Batch never leaves an orphaned alarm ringing.
+- `AlarmController.ensurePermissions()` is called once, at `startBatch` —
+  same permission check the Alarm editor does before its first
+  `addAlarm`. If denied, `SushiRiceStartResult.alarmPermissionGranted`
+  carries that back so the new-batch screen can warn ("...may not go
+  off...", same wording as the Alarm editor), rather than silently
+  scheduling something that won't fire. Not re-checked on later stage
+  transitions — permission granted once stays granted for the session.
+
+**Known simplification for TPHC**: the spec says the compliance buzzer
+should re-alert every 5 minutes until acknowledged. Real per-5-minute
+re-triggering isn't something this app's notification layer can do
+without native platform code (same documented limitation as the plain
+Alarm feature's own "repeat sound" — see `alarm.dart`'s doc comment on
+`repeatSound`); each TPHC hour mark is one Alarm with `repeatSound: true`,
+which keeps it pinned/re-alerting until Dismissed rather than literally
+re-firing on a 5-minute cadence. This is the same honest trade-off the
+Alarm feature itself already made and documented — don't try to build a
+truer 5-minute loop without checking with the user first, since it would
+mean native code beyond what's been scoped so far.
 
 ## The HACCP report ("Sushi Rice pH Log Sheet")
 
@@ -224,10 +259,11 @@ elsewhere in the app — don't reinvent)
 - IDs that need to be human-readable use an atomic per-period Firestore
   counter (`_nextBatchCode`), same pattern as the Log Sheet's own
   `Logs-MMDDYYYY####` scheme.
-- Notification ids are derived from a stable FNV-1a hash of the Firestore
-  doc id (`_stableBatchBaseId`), same technique as the Alarm feature's
-  `stableAlarmBaseId` — keeps every batch's notifications in a disjoint id
-  range without needing to track a counter.
+- No bespoke notification ids of its own anymore — every alert is a real
+  `Alarm` (see "Alarm integration" above), so alarm-id generation/storage
+  is entirely the Alarm feature's own concern (`stableAlarmBaseId`); this
+  feature just stores the resulting alarm ids on the batch to cancel them
+  later.
 - Network errors surface as "Network error. Please check your internet
   connection." via `lib/shared/utils/network_error.dart`
   (`hasNetworkConnection`, `networkAwareErrorMessage`) — used everywhere

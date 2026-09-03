@@ -12,6 +12,35 @@ import '../../staff/presentation/widgets/staff_picker.dart';
 import '../domain/sushi_rice_batch.dart';
 import 'sushi_rice_batch_controller.dart';
 
+/// Shared sizing for this screen's full-width action buttons (Start
+/// Cooking/Mixing, Measure pH, Save & Print, Acknowledge, Finish Batch,
+/// Retry Print) — same 56px-tall, bold, rounded look the new-batch flow
+/// uses, so a stage's main CTA isn't a cramped default-height button.
+ButtonStyle _bigActionStyle([Color? backgroundColor]) => ElevatedButton.styleFrom(
+  backgroundColor: backgroundColor,
+  minimumSize: const Size.fromHeight(56),
+  padding: const EdgeInsets.symmetric(vertical: 16),
+  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+);
+
+/// Shared sizing for this screen's dialog action buttons (Start Cooking,
+/// Start Mixing, Continue, Finish Batch confirmations) — dialogs keep
+/// Flutter's compact default height for Cancel/Back, but the primary
+/// confirm button gets real padding instead of hugging its text.
+ButtonStyle _dialogConfirmStyle([Color? backgroundColor]) => ElevatedButton.styleFrom(
+  backgroundColor: backgroundColor,
+  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+);
+
+ButtonStyle _bigOutlinedActionStyle() => OutlinedButton.styleFrom(
+  minimumSize: const Size.fromHeight(56),
+  padding: const EdgeInsets.symmetric(vertical: 16),
+  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+);
+
 /// Routed at `/logs/sushiRice/batch/:batchId`. Soaking, Cooking & Rest, and
 /// Mixing & Cooling share the same shape (fixed countdown, a "start next
 /// step" button locked until the SOP's minimum time, a red "Time's Up!"
@@ -250,6 +279,7 @@ class _StageCard extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
+                      style: _bigActionStyle(),
                       onPressed: actionEnabled ? onAction : null,
                       child: Text(actionLabel),
                     ),
@@ -447,7 +477,7 @@ class _CookingRestView extends ConsumerWidget {
                   child: const Text('← BACK'),
                 ),
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+                  style: _dialogConfirmStyle(AppTheme.success),
                   onPressed: staffId == null ? null : () => Navigator.of(dialogContext).pop(true),
                   child: const Text('START MIXING'),
                 ),
@@ -571,9 +601,7 @@ Future<void> _openNameOnlyDialog({
                 child: const Text('← BACK'),
               ),
               ElevatedButton(
-                style: confirmColor != null
-                    ? ElevatedButton.styleFrom(backgroundColor: confirmColor)
-                    : null,
+                style: _dialogConfirmStyle(confirmColor),
                 onPressed: staffId == null ? null : () => Navigator.of(dialogContext).pop(true),
                 child: Text(confirmLabel),
               ),
@@ -633,6 +661,7 @@ class _PrintFailedBanner extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
+              style: _bigOutlinedActionStyle(),
               onPressed: busy ? null : onRetry,
               child: Text(busy ? 'Retrying...' : 'Retry Print'),
             ),
@@ -741,6 +770,7 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
             Text(_printError!, textAlign: TextAlign.center),
             const SizedBox(height: 24),
             ElevatedButton(
+              style: _bigActionStyle(),
               onPressed: widget.busy ? null : _retryPrint,
               child: Text(widget.busy ? 'Retrying...' : 'Retry Print'),
             ),
@@ -851,6 +881,7 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
+                  style: _bigActionStyle(),
                   onPressed: () => setState(() {
                     _retesting = true;
                     _submittedOnce = false;
@@ -863,7 +894,7 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+                  style: _bigActionStyle(AppTheme.success),
                   onPressed: widget.busy ? null : _save,
                   child: Text(widget.busy ? 'Saving...' : 'SAVE & PRINT'),
                 ),
@@ -973,7 +1004,7 @@ class _ReadyToUseView extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             'pH ${batch.phReading?.toStringAsFixed(1) ?? '-'} — label printed for '
-            '"${batch.foodName}" at ${batch.readyToUseStartedAt}',
+            '"${batch.foodName ?? 'this batch'}" at ${batch.readyToUseStartedAt}',
             style: const TextStyle(fontSize: 12, color: Colors.black54),
             textAlign: TextAlign.center,
           ),
@@ -994,7 +1025,7 @@ class _ReadyToUseView extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+                    style: _bigActionStyle(AppTheme.danger),
                     onPressed: busy
                         ? null
                         : () async {
@@ -1017,6 +1048,7 @@ class _ReadyToUseView extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
+              style: _bigOutlinedActionStyle(),
               onPressed: busy ? null : () => _openFinishDialog(context, ref),
               child: const Text('Finish Batch'),
             ),
@@ -1077,6 +1109,7 @@ class _ReadyToUseView extends ConsumerWidget {
                   child: const Text('← BACK'),
                 ),
                 ElevatedButton(
+                  style: _dialogConfirmStyle(),
                   onPressed: staffId == null ? null : () => Navigator.of(dialogContext).pop(true),
                   child: const Text('FINISH BATCH'),
                 ),

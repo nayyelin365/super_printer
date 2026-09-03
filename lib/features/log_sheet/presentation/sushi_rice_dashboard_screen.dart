@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -281,10 +282,30 @@ class _BatchCard extends StatelessWidget {
 
   final SushiRiceBatch batch;
 
+  static const _stageLabels = {
+    SushiRiceStage.soaking: 'Soaking',
+    SushiRiceStage.cookingRest: 'Cooking & Rest',
+    SushiRiceStage.mixingCooling: 'Mixing & Cooling',
+    SushiRiceStage.phCheck: 'pH Check',
+    SushiRiceStage.readyToUse: 'Ready to Use',
+  };
+
+  /// This stage's own countdown deadline, per [SushiRiceStage] — pH Check
+  /// has no timer of its own (staff acts as soon as they're ready), and
+  /// Ready to Use tracks the 24-hr TPHC window instead of a short buzzer.
+  DateTime? get _stageEndsAt => switch (batch.stage) {
+    SushiRiceStage.soaking => batch.soakEndsAt,
+    SushiRiceStage.cookingRest => batch.cookRestEndsAt,
+    SushiRiceStage.mixingCooling => batch.mixCoolEndsAt,
+    SushiRiceStage.phCheck => null,
+    SushiRiceStage.readyToUse => batch.readyToUseDeadline,
+  };
+
   @override
   Widget build(BuildContext context) {
-    final remaining = batch.soakEndsAt?.difference(DateTime.now());
+    final remaining = _stageEndsAt?.difference(DateTime.now());
     final needsAction = remaining != null && remaining <= Duration.zero;
+    final stageLabel = _stageLabels[batch.stage] ?? batch.stage.name;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -308,6 +329,14 @@ class _BatchCard extends StatelessWidget {
                 batch.batchCode,
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
               ),
+              IconButton(
+                onPressed: () => _copyBatchCode(context, batch.batchCode),
+                icon: const Icon(Icons.copy, size: 14),
+                tooltip: 'Copy batch number',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              ),
               const Spacer(),
               if (remaining != null)
                 Text(
@@ -318,11 +347,19 @@ class _BatchCard extends StatelessWidget {
                     color: needsAction ? AppTheme.danger : Colors.black54,
                   ),
                 ),
+              IconButton(
+                onPressed: () => context.push('/logs/sushiRice/report/${batch.id}'),
+                icon: const Icon(Icons.description_outlined, size: 18),
+                tooltip: 'View Log Sheet',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            'Soaking',
+            stageLabel,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -332,8 +369,8 @@ class _BatchCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             needsAction
-                ? 'Sushi Rice soaking time has finished. Please proceed to the next step.'
-                : 'Sushi rice soaking in progress. Please wait until the time finishes.',
+                ? 'Sushi Rice $stageLabel time has finished. Please proceed to the next step.'
+                : 'Sushi rice $stageLabel in progress. Please wait until the time finishes.',
             style: const TextStyle(fontSize: 12, color: Colors.black54),
           ),
           const SizedBox(height: 10),
@@ -360,5 +397,13 @@ class _BatchCard extends StatelessWidget {
     final minutes = (remaining.inMinutes % 60).toString().padLeft(2, '0');
     final seconds = (remaining.inSeconds % 60).toString().padLeft(2, '0');
     return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
+  }
+
+  Future<void> _copyBatchCode(BuildContext context, String batchCode) async {
+    await Clipboard.setData(ClipboardData(text: batchCode));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Copied "$batchCode"'), duration: const Duration(seconds: 2)),
+    );
   }
 }

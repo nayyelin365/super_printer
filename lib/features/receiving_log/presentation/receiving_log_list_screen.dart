@@ -59,12 +59,18 @@ class _ReceivingLogListScreenState extends ConsumerState<ReceivingLogListScreen>
                     onPressed: () => invoicesAsync.whenData(
                       (invoices) => shareReceivingLogExcel(invoices: _applyFilters(invoices)),
                     ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    ),
                     icon: const Icon(Icons.file_download_outlined, size: 18),
                     label: const Text('Export'),
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
                     onPressed: () => context.push('/receiving-log/new'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    ),
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Add Log'),
                   ),

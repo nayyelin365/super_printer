@@ -93,6 +93,11 @@ GoRouter createAppRouter() => GoRouter(
           builder: (context, state) => const SushiRicePhLogSheetScreen(),
         ),
         GoRoute(
+          path: '/logs/sushiRice/report/:batchId',
+          builder: (context, state) =>
+              SushiRicePhLogSheetScreen(batchId: state.pathParameters['batchId']!),
+        ),
+        GoRoute(
           path: '/receiving-log',
           builder: (context, state) => const ReceivingLogListScreen(),
         ),

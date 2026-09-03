@@ -14,6 +14,17 @@ import 'receiving_log_controller.dart';
 
 const _units = ['lbs', 'kg', 'oz', 'pcs'];
 
+/// Shared sizing for this screen's Back/Save & Print buttons — same
+/// 56px-tall, bold, rounded look used elsewhere (Sushi Rice's new-batch
+/// flow) instead of the default cramped button height.
+ButtonStyle _bigButtonStyle([Color? backgroundColor]) => ElevatedButton.styleFrom(
+  backgroundColor: backgroundColor,
+  minimumSize: const Size.fromHeight(56),
+  padding: const EdgeInsets.symmetric(vertical: 16),
+  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+);
+
 /// Routed at `/receiving-log/invoice/:invoiceId/new-item` — "Add Receiving
 /// Item": shows the parent invoice's read-only info, then the item form.
 /// "Save & Print" saves the item and reuses the existing Food Rotation
@@ -296,6 +307,7 @@ class _AddReceivingItemScreenState extends ConsumerState<AddReceivingItemScreen>
                   children: [
                     Expanded(
                       child: OutlinedButton(
+                        style: _bigButtonStyle(),
                         onPressed: () => context.pop(),
                         child: const Text('← BACK'),
                       ),
@@ -303,7 +315,7 @@ class _AddReceivingItemScreenState extends ConsumerState<AddReceivingItemScreen>
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+                        style: _bigButtonStyle(AppTheme.success),
                         onPressed: _saving ? null : () => _save(invoice),
                         child: Text(_saving ? 'SAVING...' : 'SAVE & PRINT'),
                       ),
