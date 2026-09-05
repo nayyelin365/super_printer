@@ -23,6 +23,7 @@ class AppShell extends StatelessWidget {
     }
     if (location.startsWith('/logs')) return AppSection.logs;
     if (location.startsWith('/receiving-log')) return AppSection.receivingLog;
+    if (location.startsWith('/employees')) return AppSection.employees;
     return AppSection.print;
   }
 
@@ -40,6 +41,7 @@ class AppShell extends StatelessWidget {
               AppSection.logs => '/logs',
               AppSection.sushiRice => '/logs/sushiRice/dashboard',
               AppSection.receivingLog => '/receiving-log',
+              AppSection.employees => '/employees',
               AppSection.alarms => '/alarms',
               AppSection.settings => '/settings',
             }),

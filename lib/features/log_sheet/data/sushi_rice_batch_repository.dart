@@ -25,7 +25,7 @@ class SushiRiceBatchRepository {
           .map((doc) => SushiRiceBatch.fromMap(doc.id, doc.data()))
           .where((b) => b.finishedAt == null)
           .toList();
-      batches.sort((a, b) => b.batchCode.compareTo(a.batchCode));
+      batches.sort(_byCreatedAtDesc);
       return batches;
     });
   }
@@ -38,9 +38,31 @@ class SushiRiceBatchRepository {
       final batches = snapshot.docs
           .map((doc) => SushiRiceBatch.fromMap(doc.id, doc.data()))
           .toList();
-      batches.sort((a, b) => a.batchCode.compareTo(b.batchCode));
+      batches.sort((a, b) => _byCreatedAtDesc(b, a));
       return batches;
     });
+  }
+
+  /// Newest first. Sorts by `soakStartedAt` (always set at creation) rather
+  /// than `batchCode` — the code's `RICA-MMDD-##` format resets its
+  /// sequence every day and drops the year, so a plain string compare would
+  /// order batches wrong across a day or year boundary.
+  int _byCreatedAtDesc(SushiRiceBatch a, SushiRiceBatch b) {
+    final aTime = a.soakStartedAt;
+    final bTime = b.soakStartedAt;
+    if (aTime == null || bTime == null) return b.batchCode.compareTo(a.batchCode);
+    return bTime.compareTo(aTime);
+  }
+
+  /// Looks up one batch by its printed `batchCode` (what the label's QR
+  /// code actually encodes — not the Firestore doc id) — used by "Scan QR
+  /// on Label" to jump straight to that batch's detail page. A single
+  /// equality `where`, no `orderBy`, so no composite index is needed.
+  Future<SushiRiceBatch?> findByBatchCode(String batchCode) async {
+    final snapshot = await _collection.where('batchCode', isEqualTo: batchCode).limit(1).get();
+    if (snapshot.docs.isEmpty) return null;
+    final doc = snapshot.docs.first;
+    return SushiRiceBatch.fromMap(doc.id, doc.data());
   }
 
   Stream<SushiRiceBatch?> watchOne(String id) {
@@ -56,12 +78,18 @@ class SushiRiceBatchRepository {
     return SushiRiceBatch.fromMap(doc.id, {...batch.toMap(), 'batchCode': batchCode});
   }
 
-  /// `Batch-YYYY-####` — a per-year, atomically-incrementing counter (same
+  /// `RICA-MMDD-##` — a per-day, atomically-incrementing counter (same
   /// transaction pattern as `LogRepository._nextLogId`), so concurrent
-  /// batch creation across devices never collides.
+  /// batch creation across devices never collides. The counter document is
+  /// keyed by the full date (`yyyyMMdd`), not just `MMDD`, so the sequence
+  /// still resets cleanly at year boundaries without two different years'
+  /// Sep 4ths sharing a counter.
   Future<String> _nextBatchCode() async {
-    final year = DateTime.now().year;
-    final counterRef = _firestore.collection('sushi_rice_batch_counters').doc(year.toString());
+    final now = DateTime.now();
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    final dateKey = '${now.year}$mm$dd';
+    final counterRef = _firestore.collection('sushi_rice_batch_counters').doc(dateKey);
 
     final nextSeq = await _firestore.runTransaction<int>((transaction) async {
       final snapshot = await transaction.get(counterRef);
@@ -71,7 +99,7 @@ class SushiRiceBatchRepository {
       return next;
     });
 
-    return 'Batch-$year-${nextSeq.toString().padLeft(4, '0')}';
+    return 'RICA-$mm$dd-${nextSeq.toString().padLeft(2, '0')}';
   }
 
   Future<void> update(SushiRiceBatch batch) => _collection.doc(batch.id).update(batch.toMap());

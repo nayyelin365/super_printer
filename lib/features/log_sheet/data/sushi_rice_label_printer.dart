@@ -127,7 +127,7 @@ Future<Uint8List> _renderBatchLabel({
   return _renderGrayscale(width: width, height: height, paint: (canvas) {
     _paintText(
       canvas,
-      'Sushi Rice',
+      'Sushi Rice Soaking',
       rect: const Rect.fromLTWH(24, 20, 500, 50),
       fontSize: 40,
       fontWeight: FontWeight.bold,
@@ -141,17 +141,12 @@ Future<Uint8List> _renderBatchLabel({
     _paintLabelValueRow(canvas, 'Prep Date/Time:', dateFormat.format(prepDateTime), top: 300);
 
     if (soakEndsAt != null) {
-      canvas.drawRect(
-        const Rect.fromLTWH(24, 360, _designWidth - 48, 70),
-        Paint()..color = Colors.black,
-      );
-      _paintText(
+      _paintCriticalBox(
         canvas,
-        'Soak Until: ${DateFormat('EEEE h:mma').format(soakEndsAt).toUpperCase()}',
-        rect: const Rect.fromLTWH(24, 380, _designWidth - 48, 34),
-        fontSize: 26,
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
+        rect: const Rect.fromLTWH(24, 360, _designWidth - 48, 70),
+        label: 'End Time:',
+        boldTime: DateFormat('EEEE h:mma').format(soakEndsAt).toUpperCase(),
+        smallDate: DateFormat('d MMM yyyy').format(soakEndsAt),
       );
     }
 
@@ -159,7 +154,8 @@ Future<Uint8List> _renderBatchLabel({
       canvas,
       'Employee: $employeeName',
       rect: const Rect.fromLTWH(24, 460, _designWidth - 48, 30),
-      fontSize: 20,
+      fontSize: 24,
+      fontWeight: FontWeight.bold,
       align: TextAlign.right,
     );
   });
@@ -177,9 +173,9 @@ Future<Uint8List> _renderTphcLabel({
   return _renderGrayscale(width: width, height: height, paint: (canvas) {
     _paintText(
       canvas,
-      'Sushi Rice',
-      rect: const Rect.fromLTWH(24, 20, 500, 50),
-      fontSize: 40,
+      'Sushi Rice Ready to Use',
+      rect: const Rect.fromLTWH(24, 20, 640, 50),
+      fontSize: 32,
       fontWeight: FontWeight.bold,
       align: TextAlign.left,
     );
@@ -198,32 +194,27 @@ Future<Uint8List> _renderTphcLabel({
     _paintLabelValueRow(canvas, 'Batch No:', batchCode, top: 260);
     _paintLabelValueRow(canvas, 'Prep Date/Time:', dateFormat.format(prepDateTime), top: 300);
 
-    canvas.drawRect(
-      const Rect.fromLTWH(24, 360, _designWidth - 48, 70),
-      Paint()..color = Colors.black,
-    );
-    _paintText(
+    _paintCriticalBox(
       canvas,
-      'Use by: ${DateFormat('EEEE h:mma').format(useBy).toUpperCase()}',
-      rect: const Rect.fromLTWH(24, 380, _designWidth - 48, 34),
-      fontSize: 26,
-      fontWeight: FontWeight.bold,
-      color: Colors.white,
+      rect: const Rect.fromLTWH(24, 360, _designWidth - 48, 70),
+      label: 'Use by:',
+      boldTime: DateFormat('EEEE h:mma').format(useBy).toUpperCase(),
+      smallDate: DateFormat('d MMM yyyy').format(useBy),
     );
 
     _paintText(
       canvas,
       '$sushiRiceReadyToUseWindowHours hr TPHC Window',
-      rect: const Rect.fromLTWH(24, 440, 400, 26),
-      fontSize: 16,
-      color: Colors.black54,
+      rect: const Rect.fromLTWH(24, 460, 400, 30),
+      fontSize: 24,
+      color: Colors.black,
       align: TextAlign.left,
     );
     _paintText(
       canvas,
       'Employee: $employeeName',
       rect: const Rect.fromLTWH(24, 460, _designWidth - 48, 30),
-      fontSize: 20,
+      fontSize: 24,
       align: TextAlign.right,
     );
   });
@@ -272,18 +263,18 @@ void _paintLabelValueRow(Canvas canvas, String label, String value, {required do
   _paintText(
     canvas,
     label,
-    rect: Rect.fromLTWH(24, top, 300, 26),
-    fontSize: 16,
-    color: Colors.black54,
+    rect: Rect.fromLTWH(24, top, 340, 32),
+    fontSize: 25,
+    color: Colors.black,
     align: TextAlign.left,
   );
   _paintText(
     canvas,
     value,
-    rect: Rect.fromLTWH(24, top + 24, 500, 30),
-    fontSize: 22,
+    rect: Rect.fromLTWH(24, top, _designWidth - 48, 32),
+    fontSize: 30,
     fontWeight: FontWeight.bold,
-    align: TextAlign.left,
+    align: TextAlign.right,
   );
 }
 
@@ -310,6 +301,68 @@ void _paintText(
     _ => rect.left,
   };
   painter.paint(canvas, Offset(dx, rect.top));
+}
+
+/// The "End Time:"/"Use by:" critical-deadline callout — a dashed-border
+/// box (not a solid filled bar) with the label, a bold all-caps day+time,
+/// and the calendar date in one centered line.
+void _paintCriticalBox(
+  Canvas canvas, {
+  required Rect rect,
+  required String label,
+  required String boldTime,
+  required String smallDate,
+}) {
+  _paintDashedRect(canvas, rect);
+
+  final painter = TextPainter(
+    text: TextSpan(
+      children: [
+        TextSpan(text: '$label ', style: const TextStyle(color: Colors.black, fontSize: 24)),
+        TextSpan(
+          text: boldTime,
+          style: const TextStyle(color: Colors.black, fontSize: 38, fontWeight: FontWeight.bold),
+        ),
+        TextSpan(text: ' $smallDate', style: const TextStyle(color: Colors.black, fontSize: 24)),
+      ],
+    ),
+    textDirection: ui.TextDirection.ltr,
+  )..layout(maxWidth: rect.width - 24);
+
+  painter.paint(
+    canvas,
+    Offset(rect.left + (rect.width - painter.width) / 2, rect.top + (rect.height - painter.height) / 2),
+  );
+}
+
+void _paintDashedRect(
+  Canvas canvas,
+  Rect rect, {
+  double dashLength = 6,
+  double gapLength = 5,
+  double strokeWidth = 2,
+}) {
+  final paint = Paint()
+    ..color = Colors.black
+    ..strokeWidth = strokeWidth
+    ..style = PaintingStyle.stroke;
+
+  void dashedLine(Offset start, Offset end) {
+    final total = (end - start).distance;
+    final direction = (end - start) / total;
+    var drawn = 0.0;
+    while (drawn < total) {
+      final segmentStart = start + direction * drawn;
+      final segmentEnd = start + direction * (drawn + dashLength).clamp(0, total);
+      canvas.drawLine(segmentStart, segmentEnd, paint);
+      drawn += dashLength + gapLength;
+    }
+  }
+
+  dashedLine(rect.topLeft, rect.topRight);
+  dashedLine(rect.topRight, rect.bottomRight);
+  dashedLine(rect.bottomRight, rect.bottomLeft);
+  dashedLine(rect.bottomLeft, rect.topLeft);
 }
 
 void _paintQrCode(Canvas canvas, String data, {required Rect rect}) {

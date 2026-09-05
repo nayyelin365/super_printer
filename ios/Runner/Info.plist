@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>This app uses Bluetooth to discover and print to your Zebra label printer.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the camera to scan a staff member's QR badge.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app uses Bluetooth to discover and print to your Zebra label printer.</string>
 	<key>UIApplicationSceneManifest</key>

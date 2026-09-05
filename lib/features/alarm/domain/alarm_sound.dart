@@ -5,10 +5,9 @@
 class AlarmSound {
   const AlarmSound({required this.id, required this.label, this.assetPath});
 
-  /// Stable identity, persisted on the alarm. `'default'` means the
-  /// system's default notification/alarm sound; any other id must match
-  /// both a raw resource in `android/app/src/main/res/raw/<id>.mp3` and a
-  /// bundled Flutter asset at [assetPath] (used for in-app preview).
+  /// Stable identity, persisted on the alarm — must match both a raw
+  /// resource in `android/app/src/main/res/raw/<id>.mp3` and a bundled
+  /// Flutter asset at [assetPath] (used for in-app preview).
   final String id;
 
   final String label;
@@ -20,12 +19,14 @@ class AlarmSound {
   final String? assetPath;
 }
 
-const defaultAlarmSoundId = 'default';
+/// The sound every new alarm starts pre-selected with (and the fallback
+/// for a legacy/unrecognized id) — Alarm 1. There's no "Default" (system
+/// sound) option any more; every alarm has one of these three real sounds.
+const defaultAlarmSoundId = 'alarm1';
 
 const alarmSounds = [
-  AlarmSound(id: defaultAlarmSoundId, label: 'Default'),
-  AlarmSound(id: 'alarm1', label: 'Alarm 1', assetPath: 'assets/alarm/alarm1.mp3'),
-  AlarmSound(id: 'alarm2', label: 'Alarm 2', assetPath: 'assets/alarm/alarm2.mp3'),
+  AlarmSound(id: 'alarm1', label: 'Alarm 1', assetPath: 'assets/alarm/alarm2.mp3'),
+  AlarmSound(id: 'alarm2', label: 'Alarm 2', assetPath: 'assets/alarm/alarm1.mp3'),
   AlarmSound(id: 'alarm3', label: 'Alarm 3', assetPath: 'assets/alarm/alarm3.mp3'),
 ];
 

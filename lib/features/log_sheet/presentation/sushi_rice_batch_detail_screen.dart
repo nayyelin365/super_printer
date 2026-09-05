@@ -59,13 +59,31 @@ class SushiRiceBatchDetailScreen extends ConsumerStatefulWidget {
 class _SushiRiceBatchDetailScreenState extends ConsumerState<SushiRiceBatchDetailScreen> {
   Timer? _tick;
   bool _busy = false;
+  bool _autoExpireChecked = false;
 
   @override
   void initState() {
     super.initState();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
+      _maybeAutoExpire();
     });
+  }
+
+  /// Fires [SushiRiceBatchController.autoExpireIfNeeded] at most once per
+  /// screen visit — the method itself is a no-op once the batch is
+  /// finished, this flag just avoids spamming Firestore every second while
+  /// waiting for that update to stream back.
+  void _maybeAutoExpire() {
+    if (_autoExpireChecked) return;
+    final batch = ref.read(sushiRiceBatchProvider(widget.batchId)).value;
+    if (batch == null || batch.stage != SushiRiceStage.readyToUse || batch.finishedAt != null) {
+      return;
+    }
+    final deadline = batch.readyToUseDeadline;
+    if (deadline == null || !DateTime.now().isAfter(deadline)) return;
+    _autoExpireChecked = true;
+    ref.read(sushiRiceBatchControllerProvider).autoExpireIfNeeded(batch);
   }
 
   @override
@@ -310,6 +328,11 @@ class _SoakingView extends ConsumerWidget {
     final endsAt = batch.soakEndsAt;
     if (endsAt == null || batch.soakStartedAt == null) return const Text('Missing soak timer data.');
 
+    final cookByDeadline = batch.soakCookByDeadline;
+    if (cookByDeadline != null && DateTime.now().isAfter(cookByDeadline)) {
+      return _CookingWindowExpiredCard(batch: batch, busy: busy, onBusy: onBusy);
+    }
+
     final elapsed = DateTime.now().difference(batch.soakStartedAt!);
     final remaining = endsAt.difference(DateTime.now());
     final canAct = elapsed.inMinutes >= sushiRiceSoakUnlockMinutes;
@@ -373,6 +396,113 @@ class _SoakingView extends ConsumerWidget {
               },
             )
           : null,
+    );
+  }
+}
+
+/// Shown instead of the normal Soaking countdown once
+/// [SushiRiceBatch.soakCookByDeadline] (the soaking method's food-safety
+/// limit — 72 hr fridge / 2 hr room temp, not the 20–30 min buzzer) has
+/// passed: cooking this batch is no longer safe, so the only action left
+/// is Discard.
+class _CookingWindowExpiredCard extends ConsumerWidget {
+  const _CookingWindowExpiredCard({required this.batch, required this.busy, required this.onBusy});
+
+  final SushiRiceBatch batch;
+  final bool busy;
+  final ValueChanged<bool> onBusy;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 640),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFDEDED),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppTheme.danger),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.danger.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.notifications_active, color: AppTheme.danger, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(batch.batchCode, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      Text(
+                        'Soaking in ${(batch.soakingMethod ?? '').toLowerCase()}',
+                        style: const TextStyle(color: Color(0xFF1971C2), fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                const Text(
+                  '00:00',
+                  style: TextStyle(color: AppTheme.danger, fontWeight: FontWeight.w700, fontSize: 18),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Cooking Window Expired',
+              style: TextStyle(color: AppTheme.danger, fontWeight: FontWeight.w700, fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Text('The cooking window for Sushi Rice ${batch.batchCode} has expired. '
+                'This batch must be discarded.'),
+            const SizedBox(height: 16),
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(
+                    text: 'Time Remaining to Start Cooking -  ',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                  const TextSpan(
+                    text: '00:00:00',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                width: 200,
+                child: ElevatedButton(
+                  style: _bigActionStyle(AppTheme.danger),
+                  onPressed: busy
+                      ? null
+                      : () => _openFinishDialog(
+                          context: context,
+                          ref: ref,
+                          batch: batch,
+                          onBusy: onBusy,
+                          defaultStatus: 'Discarded',
+                        ),
+                  child: const Text('Discard Batch'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1045,106 +1175,143 @@ class _ReadyToUseView extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              style: _bigOutlinedActionStyle(),
-              onPressed: busy ? null : () => _openFinishDialog(context, ref),
-              child: const Text('Finish Batch'),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: _bigOutlinedActionStyle(),
+                  onPressed: busy
+                      ? null
+                      : () => _openFinishDialog(
+                          context: context,
+                          ref: ref,
+                          batch: batch,
+                          onBusy: onBusy,
+                          defaultStatus: 'Discarded',
+                        ),
+                  child: const Text('Discard'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: _bigActionStyle(AppTheme.navyDark),
+                  onPressed: busy
+                      ? null
+                      : () => _openFinishDialog(
+                          context: context,
+                          ref: ref,
+                          batch: batch,
+                          onBusy: onBusy,
+                          defaultStatus: 'Used',
+                        ),
+                  child: const Text('Finish Batch'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+}
 
-  Future<void> _openFinishDialog(BuildContext context, WidgetRef ref) async {
-    String? status = sushiRiceFinalStatuses.first;
-    String? staffId;
-    String? staffName;
+/// The "Final Batch Status" dialog (status choice + who's recording it) —
+/// shared by Ready to Use's Discard/Finish Batch buttons and Soaking's
+/// "Cooking Window Expired" card, which only ever discards. [defaultStatus]
+/// just pre-selects a chip; the dialog still lets the choice be changed.
+Future<void> _openFinishDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required SushiRiceBatch batch,
+  required ValueChanged<bool> onBusy,
+  required String defaultStatus,
+}) async {
+  String? status = defaultStatus;
+  String? staffId;
+  String? staffName;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: Text(batch.batchCode),
-              content: SizedBox(
-                width: 380,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Final Batch Status', style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final option in sushiRiceFinalStatuses)
-                          ChoiceChip(
-                            label: Text(option),
-                            selected: status == option,
-                            onSelected: (_) => setDialogState(() => status = option),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    StaffNamePicker(
-                      selectedId: staffId,
-                      onChanged: (id) {
-                        final staff = ref.read(staffMembersProvider).valueOrNull ?? const [];
-                        setDialogState(() {
-                          staffId = id;
-                          staffName = staff.where((s) => s.id == id).firstOrNull?.name;
-                        });
-                      },
-                    ),
-                  ],
-                ),
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            title: Text(batch.batchCode),
+            content: SizedBox(
+              width: 380,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Final Batch Status', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final option in sushiRiceFinalStatuses)
+                        ChoiceChip(
+                          label: Text(option),
+                          selected: status == option,
+                          onSelected: (_) => setDialogState(() => status = option),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  StaffNamePicker(
+                    selectedId: staffId,
+                    onChanged: (id) {
+                      final staff = ref.read(staffMembersProvider).valueOrNull ?? const [];
+                      setDialogState(() {
+                        staffId = id;
+                        staffName = staff.where((s) => s.id == id).firstOrNull?.name;
+                      });
+                    },
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('← BACK'),
-                ),
-                ElevatedButton(
-                  style: _dialogConfirmStyle(),
-                  onPressed: staffId == null ? null : () => Navigator.of(dialogContext).pop(true),
-                  child: const Text('FINISH BATCH'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('← BACK'),
+              ),
+              ElevatedButton(
+                style: _dialogConfirmStyle(),
+                onPressed: staffId == null ? null : () => Navigator.of(dialogContext).pop(true),
+                child: const Text('FINISH BATCH'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 
-    if (confirmed != true || staffId == null || staffName == null || status == null) return;
+  if (confirmed != true || staffId == null || staffName == null || status == null) return;
 
-    if (!await hasNetworkConnection()) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Network error. Please check your internet connection.')),
-        );
-      }
-      return;
+  if (!await hasNetworkConnection()) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error. Please check your internet connection.')),
+      );
     }
+    return;
+  }
 
-    onBusy(true);
-    try {
-      await ref
-          .read(sushiRiceBatchControllerProvider)
-          .setFinalBatchStatus(batch, status: status!, staffId: staffId!, staffName: staffName!);
-      if (context.mounted) context.pop();
-    } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(networkAwareErrorMessage(error))));
-      }
-    } finally {
-      onBusy(false);
+  onBusy(true);
+  try {
+    await ref
+        .read(sushiRiceBatchControllerProvider)
+        .setFinalBatchStatus(batch, status: status!, staffId: staffId!, staffName: staffName!);
+    if (context.mounted) context.pop();
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(networkAwareErrorMessage(error))));
     }
+  } finally {
+    onBusy(false);
   }
 }

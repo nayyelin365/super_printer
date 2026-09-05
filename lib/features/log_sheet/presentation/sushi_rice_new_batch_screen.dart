@@ -29,11 +29,12 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
   bool _riceInspectedWashed = false;
   bool _enzymeAdded = false;
   bool _riceWeightConfirmed = false;
+  String _soakingMethod = sushiRiceSoakingMethods.first;
   String? _staffId;
   String? _staffName;
   bool _saving = false;
 
-  static const _weightOptions = [3.0, 6.0, 10.0];
+  static const _weightOptions = [3.0, 6.0];
 
   /// Shared sizing so every Back/Next/Continue/Save button across all
   /// three steps ends up the same height and width (via `Expanded`
@@ -92,7 +93,7 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '1. Sushi Rice Soaking',
+                          '1. New Batch (Wash & Soaking)',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 20),
@@ -114,47 +115,90 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
   }
 
   Widget _buildWeightStep() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final maxHours = sushiRiceSoakingMethodMaxHours[_soakingMethod];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Image.asset('assets/images/weight.png', width: 18, height: 18),
-              const SizedBox(width: 8),
-              const Text('Choose Rice Weight', style: TextStyle(fontWeight: FontWeight.w600)),
+              Row(
+                children: [
+                  Image.asset('assets/images/weight.png', width: 18, height: 18),
+                  const SizedBox(width: 8),
+                  const Text('Choose Rice Weight', style: TextStyle(fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final weight in _weightOptions)
+                    _WeightOption(
+                      weightLbs: weight,
+                      selected: _riceWeightLbs == weight,
+                      onTap: () => setState(() => _riceWeightLbs = weight),
+                    ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final weight in _weightOptions)
-                _WeightOption(
-                  weightLbs: weight,
-                  selected: _riceWeightLbs == weight,
-                  onTap: () => setState(() => _riceWeightLbs = weight),
+              const Text('Soaking in', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  for (final method in sushiRiceSoakingMethods) ...[
+                    Expanded(
+                      child: _SoakMethodOption(
+                        label: 'In $method',
+                        selected: _soakingMethod == method,
+                        onTap: () => setState(() => _soakingMethod = method),
+                      ),
+                    ),
+                    if (method != sushiRiceSoakingMethods.last) const SizedBox(width: 12),
+                  ],
+                ],
+              ),
+              if (maxHours != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Critical: Must cook in $maxHours hours.',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.danger),
                 ),
+              ],
             ],
           ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: _stepButtonStyle(AppTheme.navyDark),
-              onPressed: () => setState(() => _step = 1),
-              child: const Text('NEXT →'),
-            ),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            style: _stepButtonStyle(AppTheme.navyDark),
+            onPressed: () => setState(() => _step = 1),
+            child: const Text('NEXT →'),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -308,6 +352,7 @@ class _SushiRiceNewBatchScreenState extends ConsumerState<SushiRiceNewBatchScree
             ricePotSanitized: _ricePotSanitized,
             riceInspectedWashed: _riceInspectedWashed,
             enzymeAdded: _enzymeAdded,
+            soakingMethod: _soakingMethod,
             staffId: _staffId!,
             staffName: _staffName!,
           );
@@ -376,6 +421,47 @@ class _ChecklistRow extends StatelessWidget {
               checked ? Icons.check_box : Icons.check_box_outline_blank,
               size: 22,
               color: checked ? AppTheme.success : Colors.black26,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SoakMethodOption extends StatelessWidget {
+  const _SoakMethodOption({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.success.withValues(alpha: 0.12) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? AppTheme.success : AppTheme.border, width: selected ? 2 : 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              size: 18,
+              color: selected ? AppTheme.success : Colors.black26,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(fontWeight: FontWeight.w600, color: selected ? AppTheme.success : null),
+              ),
             ),
           ],
         ),

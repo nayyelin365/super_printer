@@ -58,6 +58,10 @@ class SushiRiceBatchController {
 
   SushiRiceBatchRepository get _repository => _ref.read(sushiRiceBatchRepositoryProvider);
 
+  /// Looks up a batch by its printed `batchCode` — what "Scan QR on Label"
+  /// actually scans off a batch label, not the Firestore doc id.
+  Future<SushiRiceBatch?> findByBatchCode(String batchCode) => _repository.findByBatchCode(batchCode);
+
   /// Every "... Time's Up!" buzzer and TPHC compliance alert this SOP
   /// raises is a real entry in the app's existing Alarm system (the same
   /// one the Alarms tab shows and rings) rather than a separate
@@ -94,6 +98,7 @@ class SushiRiceBatchController {
     required bool ricePotSanitized,
     required bool riceInspectedWashed,
     required bool enzymeAdded,
+    required String soakingMethod,
     required String staffId,
     required String staffName,
     String? foodName,
@@ -112,6 +117,7 @@ class SushiRiceBatchController {
         ricePotSanitized: ricePotSanitized,
         riceInspectedWashed: riceInspectedWashed,
         enzymeAdded: enzymeAdded,
+        soakingMethod: soakingMethod,
         soakMinutes: sushiRiceSoakTotalMinutes,
         soakStartedAt: now,
         staffId: staffId,
@@ -348,6 +354,25 @@ class SushiRiceBatchController {
         finalStatusStaffName: () => staffName,
         finishedAt: () => DateTime.now(),
       ),
+    );
+  }
+
+  /// No server-side cron in this app, so "automatically discard after 24
+  /// hours" means: check opportunistically whenever a batch is rendered
+  /// (dashboard list, detail screen) and, the first time it's found past
+  /// its Ready to Use deadline with no Finish Batch action yet, close it
+  /// out as "Expired" — attributed to a system id since no one's acting.
+  /// A no-op once [SushiRiceBatch.finishedAt] is set, so repeat calls
+  /// across ticks/rebuilds are harmless.
+  Future<void> autoExpireIfNeeded(SushiRiceBatch batch) async {
+    if (batch.stage != SushiRiceStage.readyToUse || batch.finishedAt != null) return;
+    final deadline = batch.readyToUseDeadline;
+    if (deadline == null || !DateTime.now().isAfter(deadline)) return;
+    await setFinalBatchStatus(
+      batch,
+      status: 'Expired',
+      staffId: 'system',
+      staffName: 'Auto (24hr expired)',
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -35,11 +36,18 @@ String _channelIdFor(String soundId) => '$_channelIdPrefix$soundId';
 
 String _channelNameFor(String soundId) => 'Alarms (${alarmSoundById(soundId).label})';
 
+/// The id alarms saved before the "Default" (system sound) option was
+/// removed may still carry — kept only so those old alarms keep resolving
+/// to the system sound (there's no `default.mp3` raw resource to play)
+/// instead of silently failing. Not offered as a choice anywhere any more;
+/// [defaultAlarmSoundId] is unrelated to this.
+const _legacySystemSoundId = 'default';
+
 /// The Android raw-resource sound for [soundId], or null for the system
 /// default (Android plays its default alarm/notification sound when no
 /// explicit sound is set on a channel with `playSound: true`).
 AndroidNotificationSound? _androidSoundFor(String soundId) {
-  return soundId == defaultAlarmSoundId ? null : RawResourceAndroidNotificationSound(soundId);
+  return soundId == _legacySystemSoundId ? null : RawResourceAndroidNotificationSound(soundId);
 }
 
 /// Initializes the plugin, one Android notification channel per selectable
@@ -182,6 +190,15 @@ Future<void> _zonedSchedule({
   required bool repeatSound,
   required DateTimeComponents? matchDateTimeComponents,
 }) {
+  // `flutter_local_notifications` doesn't implement scheduled notifications
+  // on web at all (zonedSchedule() throws UnsupportedError there) — this
+  // app is only ever really used on Android/iOS with a real printer, so on
+  // web every alarm-scheduling call is a silent no-op rather than crashing
+  // whatever feature tried to schedule one (e.g. the Sushi Rice SOP's
+  // "Save & Print" batch creation, which would otherwise never finish
+  // saving the batch just because the browser can't set a native alarm).
+  if (kIsWeb) return Future.value();
+
   return _plugin.zonedSchedule(
     id: id,
     title: title,
@@ -230,7 +247,7 @@ Future<void> _zonedSchedule({
         // project (Runner/Resources) as .aiff/.wav/.caf — see the iOS
         // limitation noted in the alarm feature summary. Falls back to
         // the system default sound if that file isn't actually bundled.
-        sound: soundId == defaultAlarmSoundId ? null : '$soundId.mp3',
+        sound: soundId == _legacySystemSoundId ? null : '$soundId.mp3',
       ),
     ),
   );

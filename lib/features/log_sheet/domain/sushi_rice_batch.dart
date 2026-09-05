@@ -24,6 +24,13 @@ const sushiRicePhPassThreshold = 4.2;
 /// Mixing & Cooling: 25–35 min.
 const sushiRiceSoakUnlockMinutes = 20;
 const sushiRiceSoakTotalMinutes = 30;
+
+/// Soaking method, chosen on the Soaking setup screen — each carries its
+/// own food-safety deadline for how long the batch may sit before cooking
+/// must start, shown as a "Critical: Must cook in X hours" hint next to
+/// the picker.
+const sushiRiceSoakingMethods = ['Refrigerator', 'Room Temperature'];
+const sushiRiceSoakingMethodMaxHours = {'Refrigerator': 72, 'Room Temperature': 2};
 const sushiRiceCookRestUnlockMinutes = 45;
 const sushiRiceCookRestTotalMinutes = 50;
 const sushiRiceMixCoolUnlockMinutes = 25;
@@ -64,6 +71,7 @@ class SushiRiceBatch {
     this.ricePotSanitized = false,
     this.riceInspectedWashed = false,
     this.enzymeAdded = false,
+    this.soakingMethod,
     this.soakMinutes,
     this.soakStartedAt,
     this.staffId,
@@ -113,6 +121,9 @@ class SushiRiceBatch {
   final bool riceInspectedWashed;
   final bool enzymeAdded;
 
+  /// "Refrigerator" or "Room Temperature" — chosen on the Soaking setup
+  /// screen; see [sushiRiceSoakingMethods]/[sushiRiceSoakingMethodMaxHours].
+  final String? soakingMethod;
 
   final int? soakMinutes;
   final DateTime? soakStartedAt;
@@ -214,12 +225,25 @@ class SushiRiceBatch {
   DateTime? get readyToUseDeadline =>
       readyToUseStartedAt?.add(const Duration(hours: sushiRiceReadyToUseWindowHours));
 
+  /// The food-safety deadline by which cooking must start, per
+  /// [soakingMethod] (see [sushiRiceSoakingMethodMaxHours]) — separate from
+  /// [soakEndsAt], which is only the fixed 20–30 min "Start Cooking" buzzer.
+  /// Past this, the rice has sat too long to safely cook and the batch must
+  /// be discarded instead.
+  DateTime? get soakCookByDeadline {
+    final startedAt = soakStartedAt;
+    final maxHours = sushiRiceSoakingMethodMaxHours[soakingMethod];
+    if (startedAt == null || maxHours == null) return null;
+    return startedAt.add(Duration(hours: maxHours));
+  }
+
   SushiRiceBatch copyWith({
     SushiRiceStage? stage,
     double? Function()? riceWeightLbs,
     bool? ricePotSanitized,
     bool? riceInspectedWashed,
     bool? enzymeAdded,
+    String? Function()? soakingMethod,
     int? Function()? soakMinutes,
     DateTime? Function()? soakStartedAt,
     String? Function()? staffId,
@@ -261,6 +285,7 @@ class SushiRiceBatch {
       ricePotSanitized: ricePotSanitized ?? this.ricePotSanitized,
       riceInspectedWashed: riceInspectedWashed ?? this.riceInspectedWashed,
       enzymeAdded: enzymeAdded ?? this.enzymeAdded,
+      soakingMethod: soakingMethod != null ? soakingMethod() : this.soakingMethod,
       soakMinutes: soakMinutes != null ? soakMinutes() : this.soakMinutes,
       soakStartedAt: soakStartedAt != null ? soakStartedAt() : this.soakStartedAt,
       staffId: staffId != null ? staffId() : this.staffId,
@@ -313,6 +338,7 @@ class SushiRiceBatch {
       ricePotSanitized: data['ricePotSanitized'] as bool? ?? false,
       riceInspectedWashed: data['riceInspectedWashed'] as bool? ?? false,
       enzymeAdded: data['enzymeAdded'] as bool? ?? false,
+      soakingMethod: data['soakingMethod'] as String?,
       soakMinutes: data['soakMinutes'] as int?,
       soakStartedAt: parseDate('soakStartedAtMillis'),
       staffId: data['staffId'] as String?,
@@ -356,6 +382,7 @@ class SushiRiceBatch {
       'ricePotSanitized': ricePotSanitized,
       'riceInspectedWashed': riceInspectedWashed,
       'enzymeAdded': enzymeAdded,
+      if (soakingMethod != null) 'soakingMethod': soakingMethod,
       if (soakMinutes != null) 'soakMinutes': soakMinutes,
       if (soakStartedAt != null) 'soakStartedAtMillis': soakStartedAt!.millisecondsSinceEpoch,
       if (staffId != null) 'staffId': staffId,

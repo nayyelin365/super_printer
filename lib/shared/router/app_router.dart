@@ -17,6 +17,7 @@ import '../../features/printer_settings/presentation/printer_settings_screen.dar
 import '../../features/receiving_log/presentation/add_receiving_invoice_screen.dart';
 import '../../features/receiving_log/presentation/add_receiving_item_screen.dart';
 import '../../features/receiving_log/presentation/receiving_log_list_screen.dart';
+import '../../features/staff/presentation/staff_list_screen.dart';
 import '../../features/template_builder/presentation/template_builder_screen.dart';
 import '../../features/template_selection/presentation/template_selection_screen.dart';
 import '../widgets/app_shell.dart';
@@ -109,6 +110,10 @@ GoRouter createAppRouter() => GoRouter(
           path: '/receiving-log/invoice/:invoiceId/new-item',
           builder: (context, state) =>
               AddReceivingItemScreen(invoiceId: state.pathParameters['invoiceId']!),
+        ),
+        GoRoute(
+          path: '/employees',
+          builder: (context, state) => const StaffListScreen(),
         ),
       ],
     ),

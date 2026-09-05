@@ -179,6 +179,7 @@ String _fmtTime(DateTime? d) => d == null ? '' : DateFormat(_timeFmt).format(d);
 final _sections = <_Section>[
   _Section('Stage 1: Preparation', [
     ('Rice Washing & Soaking Started', (b) => _fmtTime(b.soakStartedAt)),
+    ('Soaking Method', (b) => b.soakingMethod ?? ''),
     ('Staff', (b) => b.staffName ?? ''),
     ('Rice Cooking Started', (b) => _fmtTime(b.cookRestStartedAt)),
     ('Rice Cooking Finished', (b) => _fmtTime(b.mixCoolStartedAt)),

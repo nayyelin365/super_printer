@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../shared/theme/app_theme.dart';
 import '../domain/sushi_rice_batch.dart';
@@ -24,6 +27,37 @@ class SushiRiceDashboardScreen extends ConsumerStatefulWidget {
 class _SushiRiceDashboardScreenState extends ConsumerState<SushiRiceDashboardScreen> {
   SushiRiceStage? _stageFilter;
   String _search = '';
+  Timer? _autoExpireTimer;
+  final _autoExpireChecked = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    // No server-side cron in this app, so "automatically discard after 24
+    // hours" only actually happens while someone has this dashboard open —
+    // best-effort without backend infrastructure; see
+    // `SushiRiceBatchController.autoExpireIfNeeded`.
+    _autoExpireTimer = Timer.periodic(const Duration(seconds: 30), (_) => _checkAutoExpire());
+  }
+
+  @override
+  void dispose() {
+    _autoExpireTimer?.cancel();
+    super.dispose();
+  }
+
+  void _checkAutoExpire() {
+    final batches = ref.read(activeSushiRiceBatchesProvider).valueOrNull ?? const [];
+    final controller = ref.read(sushiRiceBatchControllerProvider);
+    for (final batch in batches) {
+      if (batch.stage != SushiRiceStage.readyToUse) continue;
+      if (_autoExpireChecked.contains(batch.id)) continue;
+      final deadline = batch.readyToUseDeadline;
+      if (deadline == null || !DateTime.now().isAfter(deadline)) continue;
+      _autoExpireChecked.add(batch.id);
+      controller.autoExpireIfNeeded(batch);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +117,15 @@ class _SushiRiceDashboardScreenState extends ConsumerState<SushiRiceDashboardScr
     );
   }
 
+  /// The batch list (right side) only shows batches started today — the
+  /// stage cards' "Wait-batches" counts still cover every active batch
+  /// regardless of date.
+  bool _isToday(DateTime? dt) {
+    if (dt == null) return false;
+    final now = DateTime.now();
+    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  }
+
   Widget _buildBody(List<SushiRiceBatch> batches) {
     final counts = <SushiRiceStage, int>{};
     for (final batch in batches) {
@@ -90,6 +133,7 @@ class _SushiRiceDashboardScreenState extends ConsumerState<SushiRiceDashboardScr
     }
 
     final filtered = batches.where((b) {
+      if (!_isToday(b.soakStartedAt)) return false;
       if (_stageFilter != null && b.stage != _stageFilter) return false;
       if (_search.trim().isNotEmpty &&
           !b.batchCode.toLowerCase().contains(_search.trim().toLowerCase())) {
@@ -151,13 +195,7 @@ class _SushiRiceDashboardScreenState extends ConsumerState<SushiRiceDashboardScr
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'QR scanning isn\'t available yet — use the search box above.',
-                      ),
-                    ),
-                  ),
+                  onPressed: () => _scanQrOnLabel(context),
                   icon: SvgPicture.asset('assets/images/qr.svg', width: 18, height: 18),
                   label: const Text('Scan QR on Label'),
                   style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
@@ -183,6 +221,128 @@ class _SushiRiceDashboardScreenState extends ConsumerState<SushiRiceDashboardScr
         ],
       ),
     );
+  }
+
+  Future<void> _scanQrOnLabel(BuildContext context) async {
+    final batchId = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => const _ScanBatchQrDialog(),
+    );
+    if (batchId != null && context.mounted) {
+      context.push('/logs/sushiRice/batch/$batchId');
+    }
+  }
+}
+
+/// Scans a batch label's QR code (which encodes the printed `batchCode`,
+/// not the Firestore doc id — see `sushi_rice_label_printer.dart`), looks
+/// it up, and pops the dialog with the matched batch's id so the caller
+/// can navigate straight to its detail page.
+class _ScanBatchQrDialog extends ConsumerStatefulWidget {
+  const _ScanBatchQrDialog();
+
+  @override
+  ConsumerState<_ScanBatchQrDialog> createState() => _ScanBatchQrDialogState();
+}
+
+class _ScanBatchQrDialogState extends ConsumerState<_ScanBatchQrDialog> {
+  late final MobileScannerController _controller;
+  String? _error;
+  bool _handling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = MobileScannerController(
+      formats: const [BarcodeFormat.qrCode],
+      detectionSpeed: DetectionSpeed.noDuplicates,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Expanded(child: Text('Scan QR on Label', style: TextStyle(fontSize: 18))),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 280,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3A3A3A),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Scan the batch QR',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: 220,
+                    height: 220,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: MobileScanner(controller: _controller, onDetect: _handleDetect),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppTheme.danger, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleDetect(BarcodeCapture capture) async {
+    if (_handling) return;
+    final rawValue = capture.barcodes.map((b) => b.rawValue).whereType<String>().firstOrNull;
+    if (rawValue == null) return;
+
+    _handling = true;
+    _controller.stop();
+
+    final batch = await ref.read(sushiRiceBatchControllerProvider).findByBatchCode(rawValue);
+    if (!mounted) return;
+
+    if (batch == null) {
+      setState(() {
+        _error = 'No batch found for "$rawValue". Try scanning again.';
+        _handling = false;
+      });
+      _controller.start();
+      return;
+    }
+
+    Navigator.of(context).pop(batch.id);
   }
 }
 
@@ -218,7 +378,7 @@ class _StageCard extends StatelessWidget {
   };
 
   static const _labels = {
-    SushiRiceStage.soaking: 'Sushi Rice Soaking',
+    SushiRiceStage.soaking: 'New Batch (Wash & Soaking)',
     SushiRiceStage.cookingRest: 'Cooking & Rest',
     SushiRiceStage.mixingCooling: 'Vinegar Mixing & Cooling',
     SushiRiceStage.phCheck: 'Measure pH Level',
@@ -374,14 +534,26 @@ class _BatchCard extends StatelessWidget {
             style: const TextStyle(fontSize: 12, color: Colors.black54),
           ),
           const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
+          Align(
+            alignment: Alignment.centerRight,
             child: needsAction
                 ? ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.danger,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
                     onPressed: () => context.push('/logs/sushiRice/batch/${batch.id}'),
                     child: const Text('Take Action'),
                   )
-                : OutlinedButton(
+                : ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1F2F4),
+                      foregroundColor: Colors.black87,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
                     onPressed: () => context.push('/logs/sushiRice/batch/${batch.id}'),
                     child: const Text('View Details'),
                   ),
