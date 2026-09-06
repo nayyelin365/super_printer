@@ -36,9 +36,15 @@ const sushiRiceCookRestTotalMinutes = 50;
 const sushiRiceMixCoolUnlockMinutes = 25;
 const sushiRiceMixCoolTotalMinutes = 35;
 
-/// Vinegar amounts offered when advancing Cooking & Rest -> Mixing &
-/// Cooling.
-const sushiRiceVinegarAmountsOz = [4.0, 8.0, 12.0];
+/// Preset vinegar amounts (in cups) offered when advancing Cooking & Rest
+/// -> Mixing & Cooling — staff can also type a custom amount instead of
+/// picking one of these.
+const sushiRiceVinegarAmountsCups = [4.0, 2.0];
+
+/// Vinegar amounts (in cups) offered on a pH corrective retest — a
+/// separate, finer-grained list from [sushiRiceVinegarAmountsCups] since
+/// correcting a failed batch is a smaller top-up, not the original mix.
+const sushiRiceCorrectiveVinegarAmountsCups = [1.0, 2.0, 3.0, 4.0];
 
 /// How long a batch may sit in Ready to Use (TPHC — Time/Temperature
 /// Control for Safety) before it must be discarded.
@@ -55,6 +61,15 @@ const sushiRiceTphcReminderInterval = Duration(minutes: 5);
 /// Final outcome choices offered on Finish Batch, for "Stage 4: End of
 /// Batch Record" on the HACCP log sheet.
 const sushiRiceFinalStatuses = ['Used', 'Discarded', 'Expired'];
+
+/// Preset reasons offered when discarding a batch whose Soaking critical
+/// window (see [sushiRiceSoakingMethodMaxHours]) has expired.
+const sushiRiceDiscardReasons = [
+  'Cooking window expired',
+  'Food safety concern',
+  'Incorrect preparation',
+  'Contamination',
+];
 
 /// One Sushi Rice batch moving through the SOP — multiple can be in
 /// progress at once (the dashboard tracks all of them), each identified by
@@ -92,6 +107,7 @@ class SushiRiceBatch {
     this.correctiveActionTaken = false,
     this.correctiveActionTakenAt,
     this.correctivePhValue,
+    this.correctiveVinegarAmountOz,
     this.labelPrinted = false,
     this.readyToUseStartedAt,
     this.lastAcknowledgedHour,
@@ -100,6 +116,8 @@ class SushiRiceBatch {
     this.finalBatchStatus,
     this.finalStatusStaffId,
     this.finalStatusStaffName,
+    this.discardReason,
+    this.discardRemark,
     this.foodName,
     this.locationId,
     this.locationName,
@@ -160,10 +178,12 @@ class SushiRiceBatch {
   final DateTime? phReadingAt;
 
   /// Set once a reading has failed (> [sushiRicePhPassThreshold]) and the
-  /// batch is retested — [correctivePhValue] is the passing retest value.
+  /// batch is retested — [correctivePhValue] is the passing retest value,
+  /// [correctiveVinegarAmountOz] the extra vinegar added before retesting.
   final bool correctiveActionTaken;
   final DateTime? correctiveActionTakenAt;
   final double? correctivePhValue;
+  final double? correctiveVinegarAmountOz;
 
   /// Printed at "Save & Print" — once at batch creation (Soaking start)
   /// and again at the pH-pass 24-Hr TPHC label.
@@ -195,6 +215,12 @@ class SushiRiceBatch {
   final String? finalBatchStatus;
   final String? finalStatusStaffId;
   final String? finalStatusStaffName;
+
+  /// Set when [finalBatchStatus] is 'Discarded' via the "Cooking Window
+  /// Expired" card — one of [sushiRiceDiscardReasons] plus an optional
+  /// free-text note.
+  final String? discardReason;
+  final String? discardRemark;
 
   final String? foodName;
   final String? locationId;
@@ -264,6 +290,7 @@ class SushiRiceBatch {
     bool? correctiveActionTaken,
     DateTime? Function()? correctiveActionTakenAt,
     double? Function()? correctivePhValue,
+    double? Function()? correctiveVinegarAmountOz,
     bool? labelPrinted,
     DateTime? Function()? readyToUseStartedAt,
     int? Function()? lastAcknowledgedHour,
@@ -272,6 +299,8 @@ class SushiRiceBatch {
     String? Function()? finalBatchStatus,
     String? Function()? finalStatusStaffId,
     String? Function()? finalStatusStaffName,
+    String? Function()? discardReason,
+    String? Function()? discardRemark,
     String? foodName,
     String? locationId,
     String? locationName,
@@ -307,6 +336,9 @@ class SushiRiceBatch {
       correctiveActionTakenAt:
           correctiveActionTakenAt != null ? correctiveActionTakenAt() : this.correctiveActionTakenAt,
       correctivePhValue: correctivePhValue != null ? correctivePhValue() : this.correctivePhValue,
+      correctiveVinegarAmountOz: correctiveVinegarAmountOz != null
+          ? correctiveVinegarAmountOz()
+          : this.correctiveVinegarAmountOz,
       labelPrinted: labelPrinted ?? this.labelPrinted,
       readyToUseStartedAt:
           readyToUseStartedAt != null ? readyToUseStartedAt() : this.readyToUseStartedAt,
@@ -319,6 +351,8 @@ class SushiRiceBatch {
       finalStatusStaffId: finalStatusStaffId != null ? finalStatusStaffId() : this.finalStatusStaffId,
       finalStatusStaffName:
           finalStatusStaffName != null ? finalStatusStaffName() : this.finalStatusStaffName,
+      discardReason: discardReason != null ? discardReason() : this.discardReason,
+      discardRemark: discardRemark != null ? discardRemark() : this.discardRemark,
       foodName: foodName ?? this.foodName,
       locationId: locationId ?? this.locationId,
       locationName: locationName ?? this.locationName,
@@ -359,6 +393,7 @@ class SushiRiceBatch {
       correctiveActionTaken: data['correctiveActionTaken'] as bool? ?? false,
       correctiveActionTakenAt: parseDate('correctiveActionTakenAtMillis'),
       correctivePhValue: (data['correctivePhValue'] as num?)?.toDouble(),
+      correctiveVinegarAmountOz: (data['correctiveVinegarAmountOz'] as num?)?.toDouble(),
       labelPrinted: data['labelPrinted'] as bool? ?? false,
       readyToUseStartedAt: parseDate('readyToUseStartedAtMillis'),
       lastAcknowledgedHour: data['lastAcknowledgedHour'] as int?,
@@ -367,6 +402,8 @@ class SushiRiceBatch {
       finalBatchStatus: data['finalBatchStatus'] as String?,
       finalStatusStaffId: data['finalStatusStaffId'] as String?,
       finalStatusStaffName: data['finalStatusStaffName'] as String?,
+      discardReason: data['discardReason'] as String?,
+      discardRemark: data['discardRemark'] as String?,
       foodName: data['foodName'] as String?,
       locationId: data['locationId'] as String?,
       locationName: data['locationName'] as String?,
@@ -406,6 +443,8 @@ class SushiRiceBatch {
       if (correctiveActionTakenAt != null)
         'correctiveActionTakenAtMillis': correctiveActionTakenAt!.millisecondsSinceEpoch,
       if (correctivePhValue != null) 'correctivePhValue': correctivePhValue,
+      if (correctiveVinegarAmountOz != null)
+        'correctiveVinegarAmountOz': correctiveVinegarAmountOz,
       'labelPrinted': labelPrinted,
       if (readyToUseStartedAt != null)
         'readyToUseStartedAtMillis': readyToUseStartedAt!.millisecondsSinceEpoch,
@@ -415,6 +454,8 @@ class SushiRiceBatch {
       if (finalBatchStatus != null) 'finalBatchStatus': finalBatchStatus,
       if (finalStatusStaffId != null) 'finalStatusStaffId': finalStatusStaffId,
       if (finalStatusStaffName != null) 'finalStatusStaffName': finalStatusStaffName,
+      if (discardReason != null) 'discardReason': discardReason,
+      if (discardRemark != null) 'discardRemark': discardRemark,
       if (foodName != null) 'foodName': foodName,
       if (locationId != null) 'locationId': locationId,
       if (locationName != null) 'locationName': locationName,

@@ -10,6 +10,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../domain/sushi_rice_batch.dart';
 import 'sushi_rice_batch_controller.dart';
+import 'sushi_rice_batch_detail_screen.dart' show openSushiRiceDiscardExpiredFlow;
 
 /// Routed at `/logs/sushiRice/dashboard` — the "Sushi Rice Preparation"
 /// dashboard: five stage cards plus a live list of every batch currently
@@ -117,23 +118,24 @@ class _SushiRiceDashboardScreenState extends ConsumerState<SushiRiceDashboardScr
     );
   }
 
-  /// The batch list (right side) only shows batches started today — the
-  /// stage cards' "Wait-batches" counts still cover every active batch
-  /// regardless of date.
+  /// Both the stage cards' "Wait-batches" counts and the batch list (right
+  /// side) only cover batches started today — an in-progress batch that
+  /// spilled over from a previous day doesn't count or show up here.
   bool _isToday(DateTime? dt) {
+    //return true;
     if (dt == null) return false;
     final now = DateTime.now();
     return dt.year == now.year && dt.month == now.month && dt.day == now.day;
   }
 
   Widget _buildBody(List<SushiRiceBatch> batches) {
+    final todaysBatches = batches.where((b) => _isToday(b.soakStartedAt)).toList();
     final counts = <SushiRiceStage, int>{};
-    for (final batch in batches) {
+    for (final batch in todaysBatches) {
       counts[batch.stage] = (counts[batch.stage] ?? 0) + 1;
     }
 
-    final filtered = batches.where((b) {
-      if (!_isToday(b.soakStartedAt)) return false;
+    final filtered = todaysBatches.where((b) {
       if (_stageFilter != null && b.stage != _stageFilter) return false;
       if (_search.trim().isNotEmpty &&
           !b.batchCode.toLowerCase().contains(_search.trim().toLowerCase())) {
@@ -437,7 +439,7 @@ class _StageCard extends StatelessWidget {
   }
 }
 
-class _BatchCard extends StatelessWidget {
+class _BatchCard extends ConsumerWidget {
   const _BatchCard({required this.batch});
 
   final SushiRiceBatch batch;
@@ -462,10 +464,31 @@ class _BatchCard extends StatelessWidget {
   };
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Once a batch has a final status (Discarded/Used/Expired) it's done —
+    // never offer an action button for it again, just let staff view what
+    // happened. Normally these are already filtered out of this screen's
+    // data source, but this guards against ever showing a stale
+    // "Discard Batch"/"Take Action" button in the gap before that filter
+    // catches up (e.g. right after discarding it from this very card).
+    final isFinished = batch.finalBatchStatus != null;
+
     final remaining = _stageEndsAt?.difference(DateTime.now());
-    final needsAction = remaining != null && remaining <= Duration.zero;
-    final stageLabel = _stageLabels[batch.stage] ?? batch.stage.name;
+    final needsAction = !isFinished && remaining != null && remaining <= Duration.zero;
+    final stageLabel = isFinished
+        ? batch.finalBatchStatus!
+        : (_stageLabels[batch.stage] ?? batch.stage.name);
+
+    // Past the soaking method's food-safety deadline (72hr fridge / 2hr
+    // room temp — see `soakCookByDeadline`) cooking isn't safe any more,
+    // so the card offers Discard directly instead of "Take Action" —
+    // matches the detail screen's "Cooking Window Expired" card.
+    final cookByDeadline = batch.soakCookByDeadline;
+    final cookWindowExpired =
+        !isFinished &&
+        batch.stage == SushiRiceStage.soaking &&
+        cookByDeadline != null &&
+        DateTime.now().isAfter(cookByDeadline);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -528,7 +551,12 @@ class _BatchCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            needsAction
+            isFinished
+                ? 'This batch has been marked ${batch.finalBatchStatus!.toLowerCase()}.'
+                : cookWindowExpired
+                ? 'The cooking window for Sushi Rice ${batch.batchCode} has expired. '
+                    'This batch must be discarded.'
+                : needsAction
                 ? 'Sushi Rice $stageLabel time has finished. Please proceed to the next step.'
                 : 'Sushi rice $stageLabel in progress. Please wait until the time finishes.',
             style: const TextStyle(fontSize: 12, color: Colors.black54),
@@ -536,7 +564,35 @@ class _BatchCard extends StatelessWidget {
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerRight,
-            child: needsAction
+            child: isFinished
+                ? ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1F2F4),
+                      foregroundColor: Colors.black87,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => context.push('/logs/sushiRice/batch/${batch.id}'),
+                    child: const Text('View Details'),
+                  )
+                : cookWindowExpired
+                ? ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.danger,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => openSushiRiceDiscardExpiredFlow(
+                      context: context,
+                      ref: ref,
+                      batch: batch,
+                      onBusy: (_) {},
+                      popOnSuccess: false,
+                    ),
+                    child: const Text('Discard Batch'),
+                  )
+                : needsAction
                 ? ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.danger,

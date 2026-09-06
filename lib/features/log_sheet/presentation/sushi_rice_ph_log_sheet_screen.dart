@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../shared/theme/app_theme.dart';
 import '../domain/sushi_rice_batch.dart';
@@ -42,6 +43,18 @@ class _SushiRicePhLogSheetScreenState extends ConsumerState<SushiRicePhLogSheetS
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _scanQrOnLabel() async {
+    final scanned = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => const _ScanBatchCodeDialog(),
+    );
+    if (scanned == null || !mounted) return;
+    setState(() {
+      _search = scanned;
+      _searchController.text = scanned;
+    });
   }
 
   @override
@@ -108,30 +121,51 @@ class _SushiRicePhLogSheetScreenState extends ConsumerState<SushiRicePhLogSheetS
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 320),
-                          child: TextField(
-                            controller: _searchController,
-                            onChanged: (value) => setState(() => _search = value),
-                            decoration: InputDecoration(
-                              hintText: 'Enter Batch... (leave blank for all)',
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: _search.isEmpty
-                                  ? null
-                                  : IconButton(
-                                      icon: const Icon(Icons.close, size: 18),
-                                      onPressed: () => setState(() {
-                                        _search = '';
-                                        _searchController.clear();
-                                      }),
+                        child: SizedBox(
+                          height: 44,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(
+                                width: 400,
+                                child: TextField(
+                                  controller: _searchController,
+                                  onChanged: (value) => setState(() => _search = value),
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter Batch... (leave blank for all)',
+                                    prefixIcon: const Icon(Icons.search),
+                                    suffixIcon: _search.isEmpty
+                                        ? null
+                                        : IconButton(
+                                            icon: const Icon(Icons.close, size: 18),
+                                            onPressed: () => setState(() {
+                                              _search = '';
+                                              _searchController.clear();
+                                            }),
+                                          ),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(color: AppTheme.border),
                                     ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(color: AppTheme.border),
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 16),
+                              SizedBox(
+                                width: 260,
+                                height: 44,
+                                child: OutlinedButton.icon(
+                                  onPressed: _scanQrOnLabel,
+                                  icon: const Icon(Icons.qr_code_scanner, size: 18),
+                                  label: const Text('Scan QR on Label'),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(44),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -215,6 +249,10 @@ final _sections = <_Section>[
   ]),
   _Section('Stage 4: End of Batch Record', [
     ('Final Batch Status', (b) => b.finalBatchStatus ?? ''),
+    (
+      'Discard Reason',
+      (b) => b.finalBatchStatus == 'Discarded' ? (b.discardReason ?? '') : '',
+    ),
     ('Time of Final Status', (b) => _fmtTime(b.finishedAt)),
     ('Staff', (b) => b.finalStatusStaffName ?? ''),
   ]),
@@ -324,5 +362,90 @@ class _LogSheetTable extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Scans a batch label's QR code and pops the dialog with the raw decoded
+/// value (the printed `batchCode`) — the caller drops that straight into
+/// the search box rather than looking the batch up itself, since typing
+/// or scanning are meant to behave identically here.
+class _ScanBatchCodeDialog extends StatefulWidget {
+  const _ScanBatchCodeDialog();
+
+  @override
+  State<_ScanBatchCodeDialog> createState() => _ScanBatchCodeDialogState();
+}
+
+class _ScanBatchCodeDialogState extends State<_ScanBatchCodeDialog> {
+  late final MobileScannerController _controller;
+  bool _handled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = MobileScannerController(
+      formats: const [BarcodeFormat.qrCode],
+      detectionSpeed: DetectionSpeed.noDuplicates,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Expanded(child: Text('Scan QR on Label', style: TextStyle(fontSize: 18))),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 280,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF3A3A3A),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Scan the batch QR',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: 220,
+                height: 220,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: MobileScanner(controller: _controller, onDetect: _handleDetect),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleDetect(BarcodeCapture capture) {
+    if (_handled) return;
+    final rawValue = capture.barcodes.map((b) => b.rawValue).whereType<String>().firstOrNull;
+    if (rawValue == null) return;
+
+    _handled = true;
+    _controller.stop();
+    Navigator.of(context).pop(rawValue);
   }
 }

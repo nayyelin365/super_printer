@@ -267,7 +267,11 @@ class SushiRiceBatchController {
   /// Records a retest reading after [PhOutcome.failed] — same as
   /// [submitPhReading] but also marks corrective action as taken (with the
   /// same staff who's running the pH check).
-  Future<PhOutcome> recordCorrectiveRetest(SushiRiceBatch batch, double reading) async {
+  Future<PhOutcome> recordCorrectiveRetest(
+    SushiRiceBatch batch,
+    double reading, {
+    required double vinegarAmountOz,
+  }) async {
     final now = DateTime.now();
     final updated = batch.copyWith(
       phReading: () => reading,
@@ -275,6 +279,7 @@ class SushiRiceBatchController {
       correctiveActionTaken: true,
       correctiveActionTakenAt: () => now,
       correctivePhValue: () => reading,
+      correctiveVinegarAmountOz: () => vinegarAmountOz,
     );
     await _repository.update(updated);
 
@@ -342,6 +347,8 @@ class SushiRiceBatchController {
     required String status,
     required String staffId,
     required String staffName,
+    String? discardReason,
+    String? discardRemark,
   }) async {
     await _cancelAlarm(batch.currentStageAlarmId);
     for (final alarmId in batch.tphcAlarmIds) {
@@ -353,6 +360,8 @@ class SushiRiceBatchController {
         finalStatusStaffId: () => staffId,
         finalStatusStaffName: () => staffName,
         finishedAt: () => DateTime.now(),
+        discardReason: () => discardReason,
+        discardRemark: () => discardRemark,
       ),
     );
   }

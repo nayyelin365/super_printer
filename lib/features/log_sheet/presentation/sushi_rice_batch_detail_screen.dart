@@ -142,6 +142,15 @@ class _SushiRiceBatchDetailScreenState extends ConsumerState<SushiRiceBatchDetai
   void _setBusy(bool value) => setState(() => _busy = value);
 
   Widget _buildBody(SushiRiceBatch batch) {
+    // A batch with a final status is done, regardless of what `stage` it
+    // was last in when it got there (e.g. discarded straight out of
+    // Soaking) — show that instead of re-rendering the stage view, which
+    // would otherwise keep offering stage actions (including Discard
+    // again) for an already-closed batch.
+    if (batch.finalBatchStatus != null) {
+      return _FinalStatusView(batch: batch);
+    }
+
     switch (batch.stage) {
       case SushiRiceStage.soaking:
         return _SoakingView(batch: batch, busy: _busy, onBusy: _setBusy);
@@ -157,12 +166,84 @@ class _SushiRiceBatchDetailScreenState extends ConsumerState<SushiRiceBatchDetai
   }
 }
 
+/// Read-only summary shown once a batch has any [SushiRiceBatch.finalBatchStatus]
+/// (Used/Discarded/Expired) — no action buttons, since there's nothing
+/// left to do with a closed batch.
+class _FinalStatusView extends StatelessWidget {
+  const _FinalStatusView({required this.batch});
+
+  final SushiRiceBatch batch;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = batch.finalBatchStatus!;
+    final isDiscarded = status == 'Discarded';
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: (isDiscarded ? AppTheme.danger : AppTheme.success).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                status,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: isDiscarded ? AppTheme.danger : AppTheme.success,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _InfoRow(
+              icon: Icons.person_outline,
+              label: 'Recorded By',
+              value: batch.finalStatusStaffName ?? '-',
+            ),
+            if (batch.finishedAt != null) ...[
+              const SizedBox(height: 10),
+              _InfoRow(
+                icon: Icons.schedule,
+                label: 'Time',
+                value: DateFormat('d MMM yyyy, h:mm a').format(batch.finishedAt!),
+              ),
+            ],
+            if (isDiscarded && batch.discardReason != null) ...[
+              const SizedBox(height: 10),
+              _InfoRow(icon: Icons.info_outline, label: 'Reason', value: batch.discardReason!),
+            ],
+            if (isDiscarded &&
+                batch.discardRemark != null &&
+                batch.discardRemark!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _InfoRow(icon: Icons.notes, label: 'Remark', value: batch.discardRemark!),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Shared card layout for every fixed-countdown stage: batch info on the
 /// left, the countdown ring + upcoming-buzzer note + action button on the
 /// right. Stage-specific behavior (what the button does, print retry for
 /// Soaking) is handled by the caller.
 class _StageCard extends StatelessWidget {
-  const _StageCard({
+  const 
+  _StageCard({
     required this.stateLabel,
     required this.employeeName,
     required this.startedAt,
@@ -489,12 +570,11 @@ class _CookingWindowExpiredCard extends ConsumerWidget {
                   style: _bigActionStyle(AppTheme.danger),
                   onPressed: busy
                       ? null
-                      : () => _openFinishDialog(
+                      : () => openSushiRiceDiscardExpiredFlow(
                           context: context,
                           ref: ref,
                           batch: batch,
                           onBusy: onBusy,
-                          defaultStatus: 'Discarded',
                         ),
                   child: const Text('Discard Batch'),
                 ),
@@ -545,7 +625,9 @@ class _CookingRestView extends ConsumerWidget {
     required WidgetRef ref,
     required SushiRiceBatch batch,
   }) async {
-    double vinegarOz = sushiRiceVinegarAmountsOz.first;
+    var step = 0;
+    double? vinegarCups = sushiRiceVinegarAmountsCups.first;
+    final customController = TextEditingController();
     String? staffId;
     String? staffName;
 
@@ -555,70 +637,124 @@ class _CookingRestView extends ConsumerWidget {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
-              title: Text(batch.batchCode),
+              title: Row(
+                children: [
+                  Expanded(child: Text(batch.batchCode)),
+                  IconButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    icon: const Icon(Icons.close),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
               content: SizedBox(
                 width: 380,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.science_outlined, size: 16, color: Colors.black54),
-                        SizedBox(width: 6),
-                        Text('Add Vinegar Amount', style: TextStyle(fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 12,
-                      children: [
-                        for (final oz in sushiRiceVinegarAmountsOz)
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
+                child: step == 0
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
                             children: [
-                              Radio<double>(
-                                value: oz,
-                                groupValue: vinegarOz,
-                                onChanged: (value) => setDialogState(() => vinegarOz = value!),
-                              ),
-                              Text('${oz.toStringAsFixed(0)} Oz'),
+                              Icon(Icons.science_outlined, size: 16, color: Colors.black54),
+                              SizedBox(width: 6),
+                              Text('Add Vinegar Amount', style: TextStyle(fontWeight: FontWeight.w600)),
                             ],
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    StaffNamePicker(
-                      selectedId: staffId,
-                      onChanged: (id) {
-                        final staff = ref.read(staffMembersProvider).valueOrNull ?? const [];
-                        setDialogState(() {
-                          staffId = id;
-                          staffName = staff.where((s) => s.id == id).firstOrNull?.name;
-                        });
-                      },
-                    ),
-                  ],
-                ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              for (final cups in sushiRiceVinegarAmountsCups) ...[
+                                Expanded(
+                                  child: _VinegarOption(
+                                    label: '${cups.toStringAsFixed(0)} Cup',
+                                    selected: vinegarCups == cups,
+                                    onTap: () => setDialogState(() {
+                                      vinegarCups = cups;
+                                      customController.clear();
+                                    }),
+                                  ),
+                                ),
+                                if (cups != sushiRiceVinegarAmountsCups.last)
+                                  const SizedBox(width: 12),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: customController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(hintText: 'Or enter a custom amount (Cup)'),
+                            onChanged: (value) => setDialogState(() {
+                              final parsed = double.tryParse(value);
+                              if (parsed != null && parsed > 0) vinegarCups = parsed;
+                            }),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Mix rice and vinegar in approved tub.',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.only(left: 12, top: 4),
+                            child: Text(
+                              '•  Spread Rice, Turn top and bottom.\n'
+                              '•  Mix Well to Corporate Rice and vinegar for even acidification.',
+                              style: TextStyle(fontSize: 13, color: Colors.black54),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          StaffNamePicker(
+                            selectedId: staffId,
+                            onChanged: (id) {
+                              final staff = ref.read(staffMembersProvider).valueOrNull ?? const [];
+                              setDialogState(() {
+                                staffId = id;
+                                staffName = staff.where((s) => s.id == id).firstOrNull?.name;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('← BACK'),
-                ),
-                ElevatedButton(
-                  style: _dialogConfirmStyle(AppTheme.success),
-                  onPressed: staffId == null ? null : () => Navigator.of(dialogContext).pop(true),
-                  child: const Text('START MIXING'),
-                ),
-              ],
+              actions: step == 0
+                  ? [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: _bigActionStyle(AppTheme.navyDark),
+                          onPressed: (vinegarCups == null || vinegarCups! <= 0)
+                              ? null
+                              : () => setDialogState(() => step = 1),
+                          child: const Text('NEXT →'),
+                        ),
+                      ),
+                    ]
+                  : [
+                      TextButton(
+                        onPressed: () => setDialogState(() => step = 0),
+                        child: const Text('← BACK'),
+                      ),
+                      ElevatedButton(
+                        style: _dialogConfirmStyle(AppTheme.success),
+                        onPressed: staffId == null
+                            ? null
+                            : () => Navigator.of(dialogContext).pop(true),
+                        child: const Text('START MIXING'),
+                      ),
+                    ],
             );
           },
         );
       },
     );
 
-    if (confirmed != true || staffId == null || staffName == null) return;
+    if (confirmed != true || staffId == null || staffName == null || vinegarCups == null) return;
 
     if (!await hasNetworkConnection()) {
       if (context.mounted) {
@@ -631,9 +767,12 @@ class _CookingRestView extends ConsumerWidget {
 
     onBusy(true);
     try {
-      await ref
-          .read(sushiRiceBatchControllerProvider)
-          .startMixing(batch, vinegarAmountOz: vinegarOz, staffId: staffId!, staffName: staffName!);
+      await ref.read(sushiRiceBatchControllerProvider).startMixing(
+            batch,
+            vinegarAmountOz: vinegarCups!,
+            staffId: staffId!,
+            staffName: staffName!,
+          );
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(
@@ -643,6 +782,45 @@ class _CookingRestView extends ConsumerWidget {
     } finally {
       onBusy(false);
     }
+  }
+}
+
+/// A vinegar-amount preset box, matching the app's other radio-style
+/// selection widgets (e.g. the new-batch flow's rice-weight/soaking-method
+/// options) rather than a plain Material [Radio] row.
+class _VinegarOption extends StatelessWidget {
+  const _VinegarOption({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.success.withValues(alpha: 0.12) : AppTheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? AppTheme.success : AppTheme.border, width: selected ? 2 : 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              size: 18,
+              color: selected ? AppTheme.success : Colors.black26,
+            ),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: selected ? AppTheme.success : null)),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -881,11 +1059,38 @@ class _PhCheckView extends ConsumerStatefulWidget {
 
 class _PhCheckViewState extends ConsumerState<_PhCheckView> {
   double _reading = 0;
-  bool _submittedOnce = false;
   bool _retesting = false;
+  double _correctiveVinegarOz = sushiRiceCorrectiveVinegarAmountsCups.first;
   String? _printError;
+  late final TextEditingController _readingController;
 
-  bool get _isFail => _submittedOnce && _reading > sushiRicePhPassThreshold;
+  @override
+  void initState() {
+    super.initState();
+    _readingController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _readingController.dispose();
+    super.dispose();
+  }
+
+  /// No live evaluation until the reading actually moves off its 0.0
+  /// starting point — otherwise every fresh check would flash "within
+  /// acceptable limit" before anyone's measured anything.
+  bool get _touched => _reading > 0;
+  bool get _isFail => _touched && _reading > sushiRicePhPassThreshold;
+
+  void _setReading(double value) {
+    final clamped = value.clamp(0, 14).toDouble();
+    setState(() => _reading = clamped);
+    final text = clamped == 0 ? '' : clamped.toStringAsFixed(1);
+    _readingController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -922,10 +1127,28 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Targeted pH is ≤${sushiRicePhPassThreshold.toStringAsFixed(1)}',
+              style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.danger),
+            ),
+            const SizedBox(height: 16),
+            if (_retesting) ...[
+              const Text('Add Vinegar Amount (Cup)', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<double>(
+                initialValue: _correctiveVinegarOz,
+                items: [
+                  for (final cups in sushiRiceCorrectiveVinegarAmountsCups)
+                    DropdownMenuItem(value: cups, child: Text(cups.toStringAsFixed(0))),
+                ],
+                onChanged: (value) => setState(() => _correctiveVinegarOz = value ?? _correctiveVinegarOz),
+              ),
+              const SizedBox(height: 16),
+            ],
             const Text('Entry pH Level', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               decoration: BoxDecoration(
                 color: _isFail ? AppTheme.danger.withValues(alpha: 0.06) : AppTheme.surface,
                 borderRadius: BorderRadius.circular(8),
@@ -935,19 +1158,39 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
                 children: [
                   Expanded(
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text(
-                              _reading.toStringAsFixed(1),
-                              style: TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w800,
-                                color: _submittedOnce
-                                    ? (_isFail ? AppTheme.danger : AppTheme.success)
-                                    : Colors.black26,
+                            Expanded(
+                              child: TextField(
+                                controller: _readingController,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                textAlign: TextAlign.left,
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  hintText: '0.0',
+                                  hintStyle: const TextStyle(
+                                    fontSize: 44,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.black26,
+                                  ),
+                                ),
+                                style: TextStyle(
+                                  fontSize: 44,
+                                  fontWeight: FontWeight.w800,
+                                  color: _touched
+                                      ? (_isFail ? AppTheme.danger : AppTheme.success)
+                                      : Colors.black87,
+                                ),
+                                onChanged: (value) {
+                                  final parsed = double.tryParse(value);
+                                  setState(() => _reading = (parsed ?? 0).clamp(0, 14).toDouble());
+                                },
                               ),
                             ),
                             const SizedBox(width: 6),
@@ -958,21 +1201,22 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
                           ],
                         ),
                         Text(
-                          _submittedOnce ? '' : 'Type pH value',
+                          _touched ? '' : 'Type pH value',
                           style: const TextStyle(fontSize: 11, color: Colors.black45),
                         ),
                       ],
                     ),
                   ),
                   Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        onPressed: () => setState(() => _reading = (_reading + 0.1).clamp(0, 14)),
+                        onPressed: () => _setReading(_reading + 0.1),
                         icon: const Icon(Icons.add, size: 18),
                         visualDensity: VisualDensity.compact,
                       ),
                       IconButton(
-                        onPressed: () => setState(() => _reading = (_reading - 0.1).clamp(0, 14)),
+                        onPressed: () => _setReading(_reading - 0.1),
                         icon: const Icon(Icons.remove, size: 18),
                         visualDensity: VisualDensity.compact,
                       ),
@@ -981,7 +1225,7 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
                 ],
               ),
             ),
-            if (_submittedOnce) ...[
+            if (_touched) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -1012,12 +1256,30 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: _bigActionStyle(),
-                  onPressed: () => setState(() {
-                    _retesting = true;
-                    _submittedOnce = false;
-                    _reading = 0;
-                  }),
+                  onPressed: () {
+                    setState(() => _retesting = true);
+                    _setReading(0);
+                  },
                   child: const Text('CORRECTION ACTION'),
+                ),
+              )
+            else if (_isFail && _retesting)
+              // Failed a second time even after corrective action — no
+              // more retries, the batch goes straight to Discard instead
+              // of looping back into another correction.
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: _bigActionStyle(AppTheme.danger),
+                  onPressed: widget.busy
+                      ? null
+                      : () => openSushiRiceDiscardExpiredFlow(
+                          context: context,
+                          ref: ref,
+                          batch: widget.batch,
+                          onBusy: widget.onBusy,
+                        ),
+                  child: const Text('DISCARD'),
                 ),
               )
             else
@@ -1025,7 +1287,7 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: _bigActionStyle(AppTheme.success),
-                  onPressed: widget.busy ? null : _save,
+                  onPressed: (widget.busy || !_touched || _isFail) ? null : _save,
                   child: Text(widget.busy ? 'Saving...' : 'SAVE & PRINT'),
                 ),
               ),
@@ -1049,7 +1311,11 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
     try {
       final controller = ref.read(sushiRiceBatchControllerProvider);
       final outcome = _retesting
-          ? await controller.recordCorrectiveRetest(widget.batch, _reading)
+          ? await controller.recordCorrectiveRetest(
+              widget.batch,
+              _reading,
+              vinegarAmountOz: _correctiveVinegarOz,
+            )
           : await controller.submitPhReading(widget.batch, _reading);
       if (!mounted) return;
       switch (outcome) {
@@ -1062,7 +1328,11 @@ class _PhCheckViewState extends ConsumerState<_PhCheckView> {
             () => _printError = 'Printer is not connected. Fix the printer, then retry.',
           );
         case PhOutcome.failed:
-          setState(() => _submittedOnce = true);
+          // The Save & Print button is disabled whenever the live reading
+          // is already failing, so this only fires if the value somehow
+          // changed between click and response — the red state above
+          // already reflects it, nothing further to set here.
+          break;
       }
     } catch (error) {
       if (mounted) {
@@ -1216,10 +1486,212 @@ class _ReadyToUseView extends ConsumerWidget {
   }
 }
 
+/// "Discard Batch" from the "Cooking Window Expired" card — two dialogs in
+/// sequence: first scan a Staff ID QR badge to identify who's discarding
+/// it (same [StaffNamePicker] every other stage-transition dialog uses),
+/// then pick why (plus an optional remark) before actually discarding.
+/// Kept separate from [_openFinishDialog] since that one asks for a
+/// final-status choice, not a reason — this only ever discards.
+Future<void> openSushiRiceDiscardExpiredFlow({
+  required BuildContext context,
+  required WidgetRef ref,
+  required SushiRiceBatch batch,
+  required ValueChanged<bool> onBusy,
+  // Pops the caller's own route on success — right for the batch detail
+  // screen (leaves the now-discarded batch), wrong for the dashboard's
+  // batch card (there's no detail route on the stack to pop; that would
+  // navigate away from the dashboard itself).
+  bool popOnSuccess = true,
+}) async {
+  String? staffId;
+  String? staffName;
+
+  final identified = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Expanded(child: Text(batch.batchCode)),
+                IconButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  icon: const Icon(Icons.close),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 380,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Scan the QR code on your Staff ID to verify your identity before '
+                    'discarding this batch.',
+                  ),
+                  const SizedBox(height: 16),
+                  StaffNamePicker(
+                    selectedId: staffId,
+                    onChanged: (id) {
+                      final staff = ref.read(staffMembersProvider).valueOrNull ?? const [];
+                      setDialogState(() {
+                        staffId = id;
+                        staffName = staff.where((s) => s.id == id).firstOrNull?.name;
+                      });
+                      // A recognized scan identifies staff immediately —
+                      // no separate confirm tap needed, matching every
+                      // other QR-identified stage transition in this app.
+                      if (id != null) Navigator.of(dialogContext).pop(true);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+
+  if (identified != true || staffId == null || staffName == null || !context.mounted) return;
+
+  String? reason;
+  final remarkController = TextEditingController();
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Expanded(child: Text('Discard ${batch.batchCode} ?')),
+                IconButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  icon: const Icon(Icons.close),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 380,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Remark', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: remarkController,
+                    decoration: const InputDecoration(hintText: 'Enter here'),
+                  ),
+                  const SizedBox(height: 16),
+                  for (final option in sushiRiceDiscardReasons) ...[
+                    _DiscardReasonTile(
+                      label: option,
+                      selected: reason == option,
+                      onTap: () => setDialogState(() => reason = option),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: _bigActionStyle(AppTheme.danger),
+                  onPressed: reason == null
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(true),
+                  child: Text('DISCARD BATCH - ${batch.batchCode}'),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  if (confirmed != true || reason == null || !context.mounted) return;
+
+  if (!await hasNetworkConnection()) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error. Please check your internet connection.')),
+      );
+    }
+    return;
+  }
+
+  onBusy(true);
+  try {
+    final remark = remarkController.text.trim();
+    await ref.read(sushiRiceBatchControllerProvider).setFinalBatchStatus(
+          batch,
+          status: 'Discarded',
+          staffId: staffId!,
+          staffName: staffName!,
+          discardReason: reason,
+          discardRemark: remark.isEmpty ? null : remark,
+        );
+    if (popOnSuccess && context.mounted) context.pop();
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(networkAwareErrorMessage(error))));
+    }
+  } finally {
+    onBusy(false);
+  }
+}
+
+/// One selectable reason row in the discard dialog — light danger tint
+/// always, a stronger border/bold text once selected.
+class _DiscardReasonTile extends StatelessWidget {
+  const _DiscardReasonTile({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.danger.withValues(alpha: selected ? 0.12 : 0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.danger, width: selected ? 2 : 1),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: AppTheme.danger,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The "Final Batch Status" dialog (status choice + who's recording it) —
-/// shared by Ready to Use's Discard/Finish Batch buttons and Soaking's
-/// "Cooking Window Expired" card, which only ever discards. [defaultStatus]
+/// used by Ready to Use's Discard/Finish Batch buttons. [defaultStatus]
 /// just pre-selects a chip; the dialog still lets the choice be changed.
+/// Soaking's "Cooking Window Expired" card uses its own dedicated
+/// QR-scan-then-reason flow instead — see [openSushiRiceDiscardExpiredFlow].
 Future<void> _openFinishDialog({
   required BuildContext context,
   required WidgetRef ref,

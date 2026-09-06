@@ -154,7 +154,7 @@ Future<Uint8List> _renderBatchLabel({
       canvas,
       'Employee: $employeeName',
       rect: const Rect.fromLTWH(24, 460, _designWidth - 48, 30),
-      fontSize: 24,
+      fontSize: 30,
       fontWeight: FontWeight.bold,
       align: TextAlign.right,
     );
@@ -175,7 +175,7 @@ Future<Uint8List> _renderTphcLabel({
       canvas,
       'Sushi Rice Ready to Use',
       rect: const Rect.fromLTWH(24, 20, 640, 50),
-      fontSize: 32,
+      fontSize: 40,
       fontWeight: FontWeight.bold,
       align: TextAlign.left,
     );
@@ -183,7 +183,7 @@ Future<Uint8List> _renderTphcLabel({
       canvas,
       '${phReading.toStringAsFixed(1)} pH',
       rect: const Rect.fromLTWH(24, 70, 400, 40),
-      fontSize: 30,
+      fontSize: 38,
       fontWeight: FontWeight.bold,
       align: TextAlign.left,
     );
@@ -196,7 +196,7 @@ Future<Uint8List> _renderTphcLabel({
 
     _paintCriticalBox(
       canvas,
-      rect: const Rect.fromLTWH(24, 360, _designWidth - 48, 70),
+      rect: const Rect.fromLTWH(30, 360, _designWidth - 48, 70),
       label: 'Use by:',
       boldTime: DateFormat('EEEE h:mma').format(useBy).toUpperCase(),
       smallDate: DateFormat('d MMM yyyy').format(useBy),
@@ -206,7 +206,7 @@ Future<Uint8List> _renderTphcLabel({
       canvas,
       '$sushiRiceReadyToUseWindowHours hr TPHC Window',
       rect: const Rect.fromLTWH(24, 460, 400, 30),
-      fontSize: 24,
+      fontSize: 30,
       color: Colors.black,
       align: TextAlign.left,
     );
@@ -214,7 +214,7 @@ Future<Uint8List> _renderTphcLabel({
       canvas,
       'Employee: $employeeName',
       rect: const Rect.fromLTWH(24, 460, _designWidth - 48, 30),
-      fontSize: 24,
+      fontSize: 30,
       align: TextAlign.right,
     );
   });
@@ -264,7 +264,7 @@ void _paintLabelValueRow(Canvas canvas, String label, String value, {required do
     canvas,
     label,
     rect: Rect.fromLTWH(24, top, 340, 32),
-    fontSize: 25,
+    fontSize: 30,
     color: Colors.black,
     align: TextAlign.left,
   );
@@ -318,12 +318,12 @@ void _paintCriticalBox(
   final painter = TextPainter(
     text: TextSpan(
       children: [
-        TextSpan(text: '$label ', style: const TextStyle(color: Colors.black, fontSize: 24)),
+        TextSpan(text: '$label ', style: const TextStyle(color: Colors.black, fontSize: 30)),
         TextSpan(
           text: boldTime,
           style: const TextStyle(color: Colors.black, fontSize: 38, fontWeight: FontWeight.bold),
         ),
-        TextSpan(text: ' $smallDate', style: const TextStyle(color: Colors.black, fontSize: 24)),
+        TextSpan(text: ' $smallDate', style: const TextStyle(color: Colors.black, fontSize: 30)),
       ],
     ),
     textDirection: ui.TextDirection.ltr,

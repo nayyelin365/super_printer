@@ -30,15 +30,16 @@ class SushiRiceBatchRepository {
     });
   }
 
-  /// Every batch ever created (including finished/discarded ones), oldest
-  /// first — for the "Sushi Rice pH Log Sheet" HACCP report, which is a
-  /// historical record, not a work queue.
+  /// Every batch ever created (including finished/discarded ones), newest
+  /// first — for the "Sushi Rice pH Log Sheet" HACCP report, so today's
+  /// batches show up before older history rather than staff having to
+  /// scroll/search past everything else to reach them.
   Stream<List<SushiRiceBatch>> watchAll() {
     return _collection.snapshots().map((snapshot) {
       final batches = snapshot.docs
           .map((doc) => SushiRiceBatch.fromMap(doc.id, doc.data()))
           .toList();
-      batches.sort((a, b) => _byCreatedAtDesc(b, a));
+      batches.sort(_byCreatedAtDesc);
       return batches;
     });
   }
