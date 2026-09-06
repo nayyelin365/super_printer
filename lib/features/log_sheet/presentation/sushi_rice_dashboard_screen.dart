@@ -10,7 +10,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../domain/sushi_rice_batch.dart';
 import 'sushi_rice_batch_controller.dart';
-import 'sushi_rice_batch_detail_screen.dart' show openSushiRiceDiscardExpiredFlow;
+import 'sushi_rice_batch_detail_screen.dart'
+    show openSushiRiceDiscardExpiredFlow, openSushiRiceFinishDialog;
 
 /// Routed at `/logs/sushiRice/dashboard` — the "Sushi Rice Preparation"
 /// dashboard: five stage cards plus a live list of every batch currently
@@ -453,13 +454,14 @@ class _BatchCard extends ConsumerWidget {
   };
 
   /// This stage's own countdown deadline, per [SushiRiceStage] — pH Check
-  /// has no timer of its own (staff acts as soon as they're ready), and
-  /// Ready to Use tracks the 24-hr TPHC window instead of a short buzzer.
+  /// gets the same 30-min window as Mixing & Cooling (measure and save
+  /// within 30 min of starting), and Ready to Use tracks the 24-hr TPHC
+  /// window instead of a short buzzer.
   DateTime? get _stageEndsAt => switch (batch.stage) {
     SushiRiceStage.soaking => batch.soakEndsAt,
     SushiRiceStage.cookingRest => batch.cookRestEndsAt,
     SushiRiceStage.mixingCooling => batch.mixCoolEndsAt,
-    SushiRiceStage.phCheck => null,
+    SushiRiceStage.phCheck => batch.phCheckEndsAt,
     SushiRiceStage.readyToUse => batch.readyToUseDeadline,
   };
 
@@ -479,16 +481,39 @@ class _BatchCard extends ConsumerWidget {
         ? batch.finalBatchStatus!
         : (_stageLabels[batch.stage] ?? batch.stage.name);
 
-    // Past the soaking method's food-safety deadline (72hr fridge / 2hr
-    // room temp — see `soakCookByDeadline`) cooking isn't safe any more,
-    // so the card offers Discard directly instead of "Take Action" —
-    // matches the detail screen's "Cooking Window Expired" card.
+    // Two hard "no more retries, must discard" cutoffs, matching the
+    // detail screen's `_StageExpiredCard`: Soaking's food-safety deadline
+    // (72hr fridge / 2hr room temp — `soakCookByDeadline`), and the
+    // sushiRiceMixByMaxMinutes grace period after Cooking & Rest's own
+    // 45–50 min cook timer ends (`cookRestMixByDeadline`) — past either,
+    // the card offers Discard directly instead of "Take Action". Mixing &
+    // Cooling still only gets the plain "Time's Up!" state.
     final cookByDeadline = batch.soakCookByDeadline;
-    final cookWindowExpired =
-        !isFinished &&
+    final soakWindowExpired =
         batch.stage == SushiRiceStage.soaking &&
         cookByDeadline != null &&
         DateTime.now().isAfter(cookByDeadline);
+    final mixByDeadline = batch.cookRestMixByDeadline;
+    final mixingWindowExpired =
+        batch.stage == SushiRiceStage.cookingRest &&
+        mixByDeadline != null &&
+        DateTime.now().isAfter(mixByDeadline);
+    final cookWindowExpired = !isFinished && (soakWindowExpired || mixingWindowExpired);
+
+    // Past the short buzzer but still inside the later, harder deadline —
+    // show a live countdown to that deadline instead of the plain "time
+    // has finished" message, matching the detail screen's grace-period
+    // card. Mixing & Cooling has no such second deadline, so it just
+    // keeps the plain "Time's Up!" state.
+    final graceDeadline = switch (batch.stage) {
+      SushiRiceStage.soaking => batch.soakCookByDeadline,
+      SushiRiceStage.cookingRest => batch.cookRestMixByDeadline,
+      _ => null,
+    };
+    final inGracePeriod = needsAction && !cookWindowExpired && graceDeadline != null;
+    final graceRemainingLabel = batch.stage == SushiRiceStage.soaking
+        ? 'Time Remaining to Start Cooking'
+        : 'Time Remaining to Mix Vinegar';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -553,67 +578,136 @@ class _BatchCard extends ConsumerWidget {
           Text(
             isFinished
                 ? 'This batch has been marked ${batch.finalBatchStatus!.toLowerCase()}.'
-                : cookWindowExpired
+                : soakWindowExpired
                 ? 'The cooking window for Sushi Rice ${batch.batchCode} has expired. '
+                    'This batch must be discarded.'
+                : mixingWindowExpired
+                ? 'The mixing window for Sushi Rice ${batch.batchCode} has expired. '
                     'This batch must be discarded.'
                 : needsAction
                 ? 'Sushi Rice $stageLabel time has finished. Please proceed to the next step.'
                 : 'Sushi rice $stageLabel in progress. Please wait until the time finishes.',
             style: const TextStyle(fontSize: 12, color: Colors.black54),
           ),
+          if (inGracePeriod) ...[
+            const SizedBox(height: 6),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$graceRemainingLabel -  ',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                  TextSpan(
+                    text: _fmtHms(graceDeadline.difference(DateTime.now())),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: isFinished
-                ? ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF1F2F4),
-                      foregroundColor: Colors.black87,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          if (!isFinished && batch.stage == SushiRiceStage.readyToUse)
+            // Same two actions, same dialog, as the detail screen's Ready
+            // to Use view — no need to open the batch just to discard or
+            // finish it.
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    onPressed: () => context.push('/logs/sushiRice/batch/${batch.id}'),
-                    child: const Text('View Details'),
-                  )
-                : cookWindowExpired
-                ? ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.danger,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => openSushiRiceDiscardExpiredFlow(
+                    onPressed: () => openSushiRiceFinishDialog(
                       context: context,
                       ref: ref,
                       batch: batch,
                       onBusy: (_) {},
+                      defaultStatus: 'Discarded',
                       popOnSuccess: false,
                     ),
-                    child: const Text('Discard Batch'),
-                  )
-                : needsAction
-                ? ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.danger,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => context.push('/logs/sushiRice/batch/${batch.id}'),
-                    child: const Text('Take Action'),
-                  )
-                : ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF1F2F4),
-                      foregroundColor: Colors.black87,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => context.push('/logs/sushiRice/batch/${batch.id}'),
-                    child: const Text('View Details'),
+                    child: const Text('Discard'),
                   ),
-          ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.navyDark,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => openSushiRiceFinishDialog(
+                      context: context,
+                      ref: ref,
+                      batch: batch,
+                      onBusy: (_) {},
+                      defaultStatus: 'Used',
+                      popOnSuccess: false,
+                    ),
+                    child: const Text('Finish Batch'),
+                  ),
+                ),
+              ],
+            )
+          else
+            Align(
+              alignment: Alignment.centerRight,
+              child: isFinished
+                  ? ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F2F4),
+                        foregroundColor: Colors.black87,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => context.push('/logs/sushiRice/batch/${batch.id}'),
+                      child: const Text('View Details'),
+                    )
+                  : cookWindowExpired
+                  ? ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.danger,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => openSushiRiceDiscardExpiredFlow(
+                        context: context,
+                        ref: ref,
+                        batch: batch,
+                        onBusy: (_) {},
+                        popOnSuccess: false,
+                      ),
+                      child: const Text('Discard Batch'),
+                    )
+                  : needsAction
+                  ? ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.danger,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => context.push('/logs/sushiRice/batch/${batch.id}'),
+                      child: const Text('Take Action'),
+                    )
+                  : ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF1F2F4),
+                        foregroundColor: Colors.black87,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => context.push('/logs/sushiRice/batch/${batch.id}'),
+                      child: const Text('View Details'),
+                    ),
+            ),
         ],
       ),
     );
@@ -625,6 +719,17 @@ class _BatchCard extends ConsumerWidget {
     final minutes = (remaining.inMinutes % 60).toString().padLeft(2, '0');
     final seconds = (remaining.inSeconds % 60).toString().padLeft(2, '0');
     return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
+  }
+
+  /// `HH:MM:SS`, always — matches the detail screen's grace-period card
+  /// (e.g. "71:30:30" for a fridge-soak's 72-hr window), unlike
+  /// [_formatRemaining] which drops the hours segment under an hour.
+  String _fmtHms(Duration remaining) {
+    final clamped = remaining <= Duration.zero ? Duration.zero : remaining;
+    final h = clamped.inHours.toString().padLeft(2, '0');
+    final m = (clamped.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (clamped.inSeconds % 60).toString().padLeft(2, '0');
+    return '$h:$m:$s';
   }
 
   Future<void> _copyBatchCode(BuildContext context, String batchCode) async {

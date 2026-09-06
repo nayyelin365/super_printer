@@ -139,12 +139,16 @@ void main() {
       expect(withPh(null).phPassed, isFalse);
     });
 
-    test('readyToUseDeadline is 24 hours after readyToUseStartedAt', () {
+    test('readyToUseDeadline is 24 hours after mixCoolStartedAt (vinegar added)', () {
       final batch = SushiRiceBatch(
         id: 'b1',
         batchCode: 'Batch-2026-0001',
         stage: SushiRiceStage.readyToUse,
-        readyToUseStartedAt: DateTime(2026, 1, 1, 10),
+        // pH passing (and Ready to Use starting) can happen well after
+        // vinegar was actually added — the 24-hr shelf-life clock counts
+        // from the vinegar add, not from this later moment.
+        mixCoolStartedAt: DateTime(2026, 1, 1, 10),
+        readyToUseStartedAt: DateTime(2026, 1, 1, 10, 30),
       );
       expect(batch.readyToUseDeadline, DateTime(2026, 1, 2, 10));
     });

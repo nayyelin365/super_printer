@@ -232,8 +232,9 @@ class SushiRiceBatchController {
   }
 
   /// Confirms "Measure pH Level" — staff chosen again, moving the batch
-  /// into pH Check (no timer of its own, so no new alarm — just cancels
-  /// Mixing & Cooling's).
+  /// into pH Check. Starts its own 30-min window
+  /// ([SushiRiceBatch.phCheckEndsAt]) but no new alarm (no bespoke
+  /// notification channel for this SOP) — just cancels Mixing & Cooling's.
   Future<void> startPhCheck(
     SushiRiceBatch batch, {
     required String staffId,
@@ -243,6 +244,7 @@ class SushiRiceBatchController {
     await _repository.update(
       batch.copyWith(
         stage: SushiRiceStage.phCheck,
+        phCheckStartedAt: () => DateTime.now(),
         phCheckStaffId: () => staffId,
         phCheckStaffName: () => staffName,
         currentStageAlarmId: () => null,
@@ -294,7 +296,13 @@ class SushiRiceBatchController {
 
   Future<PhOutcome> _printTphcLabelAndStartReadyToUse(SushiRiceBatch batch) async {
     final now = DateTime.now();
-    final deadline = now.add(const Duration(hours: sushiRiceReadyToUseWindowHours));
+    // The 24-hr shelf-life clock counts from when vinegar was added
+    // (Mixing & Cooling's start), not from this exact pH-pass moment —
+    // see `SushiRiceBatch.readyToUseDeadline`. Falls back to `now` only if
+    // that's somehow missing, which shouldn't happen once pH Check has
+    // been reached.
+    final vinegarAddedAt = batch.mixCoolStartedAt ?? now;
+    final deadline = vinegarAddedAt.add(const Duration(hours: sushiRiceReadyToUseWindowHours));
     final printResult = await printSushiRiceTphcLabel(
       _ref,
       batchCode: batch.batchCode,
@@ -305,16 +313,17 @@ class SushiRiceBatchController {
     );
     if (!printResult.success) return PhOutcome.passedButPrintFailed;
 
-    // One real Alarm per TPHC hour mark. Each keeps re-alerting until
-    // dismissed (`repeatSound: true`) — the closest honest match to "buzz
-    // every 5 minutes until Acknowledge" this app's notification layer
-    // can actually do without native platform code (see the Alarm
+    // One real Alarm per TPHC hour mark, each counted from the same
+    // vinegar-added anchor as `deadline` above. Each keeps re-alerting
+    // until dismissed (`repeatSound: true`) — the closest honest match to
+    // "buzz every 5 minutes until Acknowledge" this app's notification
+    // layer can actually do without native platform code (see the Alarm
     // feature's own documented "repeat sound" limitation); "Acknowledge"
     // in the TPHC screen deletes the alarm outright.
     final alarmIds = <String>[];
     for (final hour in sushiRiceTphcAlertHours) {
       final id = await _scheduleAlarm(
-        at: now.add(Duration(hours: hour)),
+        at: vinegarAddedAt.add(Duration(hours: hour)),
         title: '${batch.batchCode} — TPHC Check ($hour hr)',
       );
       alarmIds.add(id);

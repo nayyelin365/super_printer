@@ -411,7 +411,16 @@ class _SoakingView extends ConsumerWidget {
 
     final cookByDeadline = batch.soakCookByDeadline;
     if (cookByDeadline != null && DateTime.now().isAfter(cookByDeadline)) {
-      return _CookingWindowExpiredCard(batch: batch, busy: busy, onBusy: onBusy);
+      return _StageExpiredCard(
+        batch: batch,
+        busy: busy,
+        onBusy: onBusy,
+        subtitle: 'Soaking in ${(batch.soakingMethod ?? '').toLowerCase()}',
+        title: 'Cooking Window Expired',
+        message: 'The cooking window for Sushi Rice ${batch.batchCode} has expired. '
+            'This batch must be discarded.',
+        remainingLabel: 'Time Remaining to Start Cooking',
+      );
     }
 
     final elapsed = DateTime.now().difference(batch.soakStartedAt!);
@@ -481,17 +490,31 @@ class _SoakingView extends ConsumerWidget {
   }
 }
 
-/// Shown instead of the normal Soaking countdown once
-/// [SushiRiceBatch.soakCookByDeadline] (the soaking method's food-safety
-/// limit — 72 hr fridge / 2 hr room temp, not the 20–30 min buzzer) has
-/// passed: cooking this batch is no longer safe, so the only action left
-/// is Discard.
-class _CookingWindowExpiredCard extends ConsumerWidget {
-  const _CookingWindowExpiredCard({required this.batch, required this.busy, required this.onBusy});
+/// Shown instead of a stage's normal countdown once its hard "no more
+/// retries, must discard" deadline has passed — Soaking's food-safety
+/// limit ([SushiRiceBatch.soakCookByDeadline]: 72 hr fridge / 2 hr room
+/// temp) or Cooking & Rest's own 30-min max ([SushiRiceBatch.cookRestEndsAt]),
+/// unlike Mixing & Cooling's plain "Time's Up!" state, which still allows
+/// the action late. [subtitle]/[title]/[message]/[remainingLabel] are the
+/// only per-stage differences; the layout and Discard flow are shared.
+class _StageExpiredCard extends ConsumerWidget {
+  const _StageExpiredCard({
+    required this.batch,
+    required this.busy,
+    required this.onBusy,
+    required this.subtitle,
+    required this.title,
+    required this.message,
+    required this.remainingLabel,
+  });
 
   final SushiRiceBatch batch;
   final bool busy;
   final ValueChanged<bool> onBusy;
+  final String subtitle;
+  final String title;
+  final String message;
+  final String remainingLabel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -526,7 +549,7 @@ class _CookingWindowExpiredCard extends ConsumerWidget {
                     children: [
                       Text(batch.batchCode, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                       Text(
-                        'Soaking in ${(batch.soakingMethod ?? '').toLowerCase()}',
+                        subtitle,
                         style: const TextStyle(color: Color(0xFF1971C2), fontWeight: FontWeight.w600),
                       ),
                     ],
@@ -539,21 +562,17 @@ class _CookingWindowExpiredCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Cooking Window Expired',
-              style: TextStyle(color: AppTheme.danger, fontWeight: FontWeight.w700, fontSize: 18),
+            Text(
+              title,
+              style: const TextStyle(color: AppTheme.danger, fontWeight: FontWeight.w700, fontSize: 18),
             ),
             const SizedBox(height: 8),
-            Text('The cooking window for Sushi Rice ${batch.batchCode} has expired. '
-                'This batch must be discarded.'),
+            Text(message),
             const SizedBox(height: 16),
             Text.rich(
               TextSpan(
                 children: [
-                  const TextSpan(
-                    text: 'Time Remaining to Start Cooking -  ',
-                    style: TextStyle(color: Colors.black54),
-                  ),
+                  TextSpan(text: '$remainingLabel -  ', style: const TextStyle(color: Colors.black54)),
                   const TextSpan(
                     text: '00:00:00',
                     style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
@@ -599,6 +618,23 @@ class _CookingRestView extends ConsumerWidget {
     final endsAt = batch.cookRestEndsAt;
     if (endsAt == null || batch.cookRestStartedAt == null) {
       return const Text('Missing Cook & Rest timer data.');
+    }
+
+    // Unlike Soaking/Mixing & Cooling's plain "Time's Up!" state, staff
+    // only has sushiRiceMixByMaxMinutes past the cook timer's own end
+    // before mixing becomes unsafe and the batch must be discarded.
+    final mixByDeadline = batch.cookRestMixByDeadline;
+    if (mixByDeadline != null && DateTime.now().isAfter(mixByDeadline)) {
+      return _StageExpiredCard(
+        batch: batch,
+        busy: busy,
+        onBusy: onBusy,
+        subtitle: 'Cooking & Rest',
+        title: 'Mixing Window Expired',
+        message: 'The mixing window for Sushi Rice ${batch.batchCode} has expired. '
+            'This batch must be discarded.',
+        remainingLabel: 'Time Remaining to Mix Vinegar',
+      );
     }
 
     final elapsed = DateTime.now().difference(batch.cookRestStartedAt!);
@@ -1452,7 +1488,7 @@ class _ReadyToUseView extends ConsumerWidget {
                   style: _bigOutlinedActionStyle(),
                   onPressed: busy
                       ? null
-                      : () => _openFinishDialog(
+                      : () => openSushiRiceFinishDialog(
                           context: context,
                           ref: ref,
                           batch: batch,
@@ -1468,7 +1504,7 @@ class _ReadyToUseView extends ConsumerWidget {
                   style: _bigActionStyle(AppTheme.navyDark),
                   onPressed: busy
                       ? null
-                      : () => _openFinishDialog(
+                      : () => openSushiRiceFinishDialog(
                           context: context,
                           ref: ref,
                           batch: batch,
@@ -1490,7 +1526,7 @@ class _ReadyToUseView extends ConsumerWidget {
 /// sequence: first scan a Staff ID QR badge to identify who's discarding
 /// it (same [StaffNamePicker] every other stage-transition dialog uses),
 /// then pick why (plus an optional remark) before actually discarding.
-/// Kept separate from [_openFinishDialog] since that one asks for a
+/// Kept separate from [openSushiRiceFinishDialog] since that one asks for a
 /// final-status choice, not a reason — this only ever discards.
 Future<void> openSushiRiceDiscardExpiredFlow({
   required BuildContext context,
@@ -1692,12 +1728,16 @@ class _DiscardReasonTile extends StatelessWidget {
 /// just pre-selects a chip; the dialog still lets the choice be changed.
 /// Soaking's "Cooking Window Expired" card uses its own dedicated
 /// QR-scan-then-reason flow instead — see [openSushiRiceDiscardExpiredFlow].
-Future<void> _openFinishDialog({
+Future<void> openSushiRiceFinishDialog({
   required BuildContext context,
   required WidgetRef ref,
   required SushiRiceBatch batch,
   required ValueChanged<bool> onBusy,
   required String defaultStatus,
+  // See `openSushiRiceDiscardExpiredFlow`'s same parameter — true is right
+  // for the batch detail screen (leaves the now-closed batch), false for
+  // the dashboard's batch card (no detail route on the stack to pop).
+  bool popOnSuccess = true,
 }) async {
   String? status = defaultStatus;
   String? staffId;

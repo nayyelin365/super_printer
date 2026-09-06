@@ -19,9 +19,9 @@ const sushiRicePhPassThreshold = 4.2;
 /// Each timer stage is a fixed countdown, not a staff-chosen duration —
 /// its "start next step" button stays disabled for the first `unlock`
 /// minutes (the SOP's minimum time), then becomes available for the rest
-/// of the window; if it's still not tapped by `total`, the "Time's Up!"
-/// alert fires. Soak: 20–30 min. Cook & Rest: 45–50 min.
-/// Mixing & Cooling: 25–35 min.
+/// of the window. Soak: 20–30 min. Cook & Rest: 45–50 min (the actual
+/// cooking time — see [sushiRiceMixByMaxMinutes] for the separate
+/// post-cook mixing deadline). Mixing & Cooling: 1–30 min.
 const sushiRiceSoakUnlockMinutes = 20;
 const sushiRiceSoakTotalMinutes = 30;
 
@@ -33,8 +33,27 @@ const sushiRiceSoakingMethods = ['Refrigerator', 'Room Temperature'];
 const sushiRiceSoakingMethodMaxHours = {'Refrigerator': 72, 'Room Temperature': 2};
 const sushiRiceCookRestUnlockMinutes = 45;
 const sushiRiceCookRestTotalMinutes = 50;
-const sushiRiceMixCoolUnlockMinutes = 25;
-const sushiRiceMixCoolTotalMinutes = 35;
+
+/// How long, after Cook & Rest's own 45–50 min cook timer ends
+/// ([SushiRiceBatch.cookRestEndsAt]), staff still has to actually start
+/// mixing — 1 to 30 minutes. Past that, the batch can no longer be mixed
+/// at all and must be discarded instead (see
+/// [SushiRiceBatch.cookRestMixByDeadline] / the "Mixing Window Expired"
+/// card) — a separate, later deadline from the cook timer itself, unlike
+/// Soak/Mixing & Cooling's plain "Time's Up!" state, which still allows
+/// the action late with no hard cutoff.
+const sushiRiceMixByUnlockMinutes = 1;
+const sushiRiceMixByMaxMinutes = 30;
+
+const sushiRiceMixCoolUnlockMinutes = 1;
+const sushiRiceMixCoolTotalMinutes = 30;
+
+/// How long staff has to actually measure and save the pH reading once
+/// pH Check starts (see [SushiRiceBatch.phCheckStartedAt]/[phCheckEndsAt])
+/// — same 30-min window as every other stage, shown as a plain "Time's
+/// Up!" state past it (no separate hard discard deadline, matching
+/// Mixing & Cooling's treatment rather than Cooking & Rest's).
+const sushiRicePhCheckMaxMinutes = 30;
 
 /// Preset vinegar amounts (in cups) offered when advancing Cooking & Rest
 /// -> Mixing & Cooling — staff can also type a custom amount instead of
@@ -100,6 +119,7 @@ class SushiRiceBatch {
     this.mixCoolStartedAt,
     this.mixCoolStaffId,
     this.mixCoolStaffName,
+    this.phCheckStartedAt,
     this.phCheckStaffId,
     this.phCheckStaffName,
     this.phReading,
@@ -168,7 +188,9 @@ class SushiRiceBatch {
   final String? mixCoolStaffName;
 
   /// Who confirmed "Measure pH Level" (Mixing & Cooling -> pH Check) — also
-  /// the staff who takes the pH reading(s) below.
+  /// the staff who takes the pH reading(s) below. [phCheckStartedAt]
+  /// anchors [phCheckEndsAt] (the 30-min window to measure and save).
+  final DateTime? phCheckStartedAt;
   final String? phCheckStaffId;
   final String? phCheckStaffName;
 
@@ -248,8 +270,26 @@ class SushiRiceBatch {
           ? mixCoolStartedAt!.add(Duration(minutes: mixCoolMinutes!))
           : null;
 
+  /// The 30-min window ([sushiRicePhCheckMaxMinutes]) staff has, once pH
+  /// Check starts, to measure and save the reading.
+  DateTime? get phCheckEndsAt =>
+      phCheckStartedAt?.add(const Duration(minutes: sushiRicePhCheckMaxMinutes));
+
+  /// The hard deadline by which mixing must start once Cook & Rest's own
+  /// 45–50 min cook timer ends — [sushiRiceMixByMaxMinutes] after
+  /// [cookRestEndsAt], not after [cookRestStartedAt]. Past this, mixing is
+  /// no longer safe and the batch must be discarded.
+  DateTime? get cookRestMixByDeadline =>
+      cookRestEndsAt?.add(const Duration(minutes: sushiRiceMixByMaxMinutes));
+
+  /// The 24-hr TPHC shelf-life deadline — counted from [mixCoolStartedAt]
+  /// (the moment vinegar was added, which doubles as "Vinegar Mixing Time"
+  /// on the log sheet), not from [readyToUseStartedAt] (when pH happened
+  /// to pass, which can be up to ~30 min later). Explicit product decision:
+  /// the rice's shelf clock starts at the vinegar add, regardless of how
+  /// long the pH check itself took.
   DateTime? get readyToUseDeadline =>
-      readyToUseStartedAt?.add(const Duration(hours: sushiRiceReadyToUseWindowHours));
+      mixCoolStartedAt?.add(const Duration(hours: sushiRiceReadyToUseWindowHours));
 
   /// The food-safety deadline by which cooking must start, per
   /// [soakingMethod] (see [sushiRiceSoakingMethodMaxHours]) — separate from
@@ -283,6 +323,7 @@ class SushiRiceBatch {
     DateTime? Function()? mixCoolStartedAt,
     String? Function()? mixCoolStaffId,
     String? Function()? mixCoolStaffName,
+    DateTime? Function()? phCheckStartedAt,
     String? Function()? phCheckStaffId,
     String? Function()? phCheckStaffName,
     double? Function()? phReading,
@@ -328,6 +369,7 @@ class SushiRiceBatch {
       mixCoolStartedAt: mixCoolStartedAt != null ? mixCoolStartedAt() : this.mixCoolStartedAt,
       mixCoolStaffId: mixCoolStaffId != null ? mixCoolStaffId() : this.mixCoolStaffId,
       mixCoolStaffName: mixCoolStaffName != null ? mixCoolStaffName() : this.mixCoolStaffName,
+      phCheckStartedAt: phCheckStartedAt != null ? phCheckStartedAt() : this.phCheckStartedAt,
       phCheckStaffId: phCheckStaffId != null ? phCheckStaffId() : this.phCheckStaffId,
       phCheckStaffName: phCheckStaffName != null ? phCheckStaffName() : this.phCheckStaffName,
       phReading: phReading != null ? phReading() : this.phReading,
@@ -386,6 +428,7 @@ class SushiRiceBatch {
       mixCoolStartedAt: parseDate('mixCoolStartedAtMillis'),
       mixCoolStaffId: data['mixCoolStaffId'] as String?,
       mixCoolStaffName: data['mixCoolStaffName'] as String?,
+      phCheckStartedAt: parseDate('phCheckStartedAtMillis'),
       phCheckStaffId: data['phCheckStaffId'] as String?,
       phCheckStaffName: data['phCheckStaffName'] as String?,
       phReading: (data['phReading'] as num?)?.toDouble(),
@@ -435,6 +478,8 @@ class SushiRiceBatch {
         'mixCoolStartedAtMillis': mixCoolStartedAt!.millisecondsSinceEpoch,
       if (mixCoolStaffId != null) 'mixCoolStaffId': mixCoolStaffId,
       if (mixCoolStaffName != null) 'mixCoolStaffName': mixCoolStaffName,
+      if (phCheckStartedAt != null)
+        'phCheckStartedAtMillis': phCheckStartedAt!.millisecondsSinceEpoch,
       if (phCheckStaffId != null) 'phCheckStaffId': phCheckStaffId,
       if (phCheckStaffName != null) 'phCheckStaffName': phCheckStaffName,
       if (phReading != null) 'phReading': phReading,
