@@ -55,29 +55,33 @@ class PrintDetailsPanel extends ConsumerWidget {
                   icon: const Icon(Icons.save_outlined),
                   tooltip: 'Save hours, employee & PH for this food',
                 ),
-              Tooltip(
-                message: 'Labels printed today',
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.border),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.today_outlined, size: 14, color: Colors.black54),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$printCount',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                      ),
-                    ],
+              if (state.labelData is PokeBowlLabelData)
+                Tooltip(
+                  message: 'Labels printed today',
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.today_outlined,
+                            size: 14, color: Colors.black54),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$printCount',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               SizedBox(
                 width: 120,
                 child: ElevatedButton(
@@ -154,30 +158,69 @@ class PrintDetailsPanel extends ConsumerWidget {
           const SizedBox(height: 18),
 
           if (state.labelData.useBy case final useBy?) ...[
-            _SectionLabel(
-              state.template == LabelTemplateType.foodRotation
-                  ? 'USE BY — FROM PREP'
-                  : 'USE BY — FROM PACKED',
+            Row(
+              children: [
+                Expanded(
+                  child: _SectionLabel(
+                    state.useByMode == UseByMode.dateTime
+                        ? 'USE BY — DATE & TIME'
+                        : state.template == LabelTemplateType.foodRotation
+                            ? 'USE BY — FROM PREP'
+                            : 'USE BY — FROM PACKED',
+                  ),
+                ),
+                Text(
+                  state.useByMode == UseByMode.hours ? 'Hours' : 'Date & time',
+                  style: const TextStyle(fontSize: 11, color: Colors.black45),
+                ),
+                Switch(
+                  value: state.useByMode == UseByMode.dateTime,
+                  onChanged: (on) => controller.setUseByMode(
+                    on ? UseByMode.dateTime : UseByMode.hours,
+                  ),
+                ),
+              ],
             ),
-            TextFormField(
-              key: ValueKey('usebyamount-${state.formGeneration}'),
-              initialValue: state.useByAmount.toString(),
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                hintText: 'e.g. 12',
-                suffixText: 'hours',
-                suffixStyle: TextStyle(fontSize: 11, color: Colors.black45),
+            if (state.useByMode == UseByMode.hours) ...[
+              TextFormField(
+                key: ValueKey('usebyamount-${state.formGeneration}'),
+                initialValue: state.useByAmount.toString(),
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. 12',
+                  suffixText: 'hours',
+                  suffixStyle: TextStyle(fontSize: 11, color: Colors.black45),
+                ),
+                onChanged: (text) {
+                  final parsed = int.tryParse(text);
+                  if (parsed != null) controller.updateUseByAmount(parsed);
+                },
               ),
-              onChanged: (text) {
-                final parsed = int.tryParse(text);
-                if (parsed != null) controller.updateUseByAmount(parsed);
-              },
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Use By: ${dateFormat.format(useBy)}',
-              style: const TextStyle(fontSize: 12, color: Colors.black54),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                'Use By: ${dateFormat.format(useBy)}',
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+            ] else
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _pickUseByDateTime(context, controller, useBy),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppTheme.border),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(dateFormat.format(useBy))),
+                      const Icon(Icons.edit_calendar_outlined,
+                          size: 18, color: Colors.black45),
+                    ],
+                  ),
+                ),
+              ),
             const SizedBox(height: 18),
           ],
 
@@ -338,6 +381,30 @@ class PrintDetailsPanel extends ConsumerWidget {
   /// confirmed) already guarantees no field values leak between templates.
   void _changeTemplate(BuildContext context) {
     context.go('/templates');
+  }
+
+  Future<void> _pickUseByDateTime(
+    BuildContext context,
+    LabelPrintController controller,
+    DateTime current,
+  ) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(current.year - 1),
+      lastDate: DateTime(current.year + 5),
+    );
+    if (date == null || !context.mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current),
+    );
+    if (time == null) return;
+
+    controller.updateUseByDateTime(
+      DateTime(date.year, date.month, date.day, time.hour, time.minute),
+    );
   }
 }
 

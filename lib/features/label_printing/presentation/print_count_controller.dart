@@ -2,9 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/print_count_storage.dart';
 
-/// Number of labels printed today, shown beside the Print button. Bumped
-/// by [LabelPrintController.print] on every successful print (by however
-/// many copies were just printed) and persisted per calendar day — on a
+/// Number of custom poke bowl labels printed today, shown beside the Print
+/// button (only for that label). Bumped by [LabelPrintController.print]
+/// after a successful poke bowl print (by however many copies were just
+/// printed) and persisted per calendar day — on a
 /// new day the saved count belongs to a different date, so it's ignored
 /// and today starts back at 0.
 class PrintCountController extends StateNotifier<int> {

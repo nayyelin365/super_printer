@@ -16,10 +16,20 @@ import '../domain/label_template_renderer.dart';
 import '../domain/poke_bowl_pricing.dart';
 import 'print_count_controller.dart';
 
+/// How the Use By date/time is decided.
+///
+/// - [hours]: user types a number of hours; Use By is that offset from the
+///   template's "start" (packed date for Poke Bowl, prep date/time for
+///   Food Rotation, packed time for custom templates). This is the default.
+/// - [dateTime]: user picks an absolute Use By date and time directly —
+///   handy for long shelf lives where counting hours is awkward.
+enum UseByMode { hours, dateTime }
+
 class LabelPrintState {
   LabelPrintState({
     LabelData? labelData,
     this.quantity = 1,
+    this.useByMode = UseByMode.hours,
     this.useByAmount = 24,
     this.amountText = '',
     this.amountGeneration = 0,
@@ -34,8 +44,13 @@ class LabelPrintState {
   final LabelData labelData;
   final int quantity;
 
+  /// Whether Use By is computed from [useByAmount] hours or set to an
+  /// absolute date/time the user picked — see [UseByMode].
+  final UseByMode useByMode;
+
   /// Number of hours from the template's "start" date/time the user typed
-  /// for Use By — see [LabelPrintController.useByDuration].
+  /// for Use By — see [LabelPrintController.useByDuration]. Only meaningful
+  /// while [useByMode] is [UseByMode.hours].
   final int useByAmount;
   final String amountText;
 
@@ -73,6 +88,7 @@ class LabelPrintState {
   LabelPrintState copyWith({
     LabelData? labelData,
     int? quantity,
+    UseByMode? useByMode,
     int? useByAmount,
     String? amountText,
     int? amountGeneration,
@@ -86,6 +102,7 @@ class LabelPrintState {
     return LabelPrintState(
       labelData: labelData ?? this.labelData,
       quantity: quantity ?? this.quantity,
+      useByMode: useByMode ?? this.useByMode,
       useByAmount: useByAmount ?? this.useByAmount,
       amountText: amountText ?? this.amountText,
       amountGeneration: amountGeneration ?? this.amountGeneration,
@@ -312,6 +329,53 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     );
   }
 
+  /// The template's "start" date/time that hours-mode Use By counts from.
+  static DateTime? _useByStart(LabelData data) => switch (data) {
+        PokeBowlLabelData d => d.packedAt,
+        FoodRotationLabelData d => d.prepDateTime,
+        CustomLabelData d when d.useBy != null => d.packedAt,
+        _ => null,
+      };
+
+  /// Writes an absolute Use By [value] onto whichever label type is active.
+  static LabelData _withUseBy(LabelData data, DateTime value) => switch (data) {
+        PokeBowlLabelData d => d.copyWith(useBy: value),
+        FoodRotationLabelData d => d.copyWith(useBy: value),
+        CustomLabelData d when d.useBy != null =>
+          d.copyWith(useByAt: () => value),
+        _ => data,
+      };
+
+  /// Switches between typing hours and picking an absolute Use By date/time.
+  /// Going back to hours recomputes Use By from the current [useByAmount].
+  void setUseByMode(UseByMode mode) {
+    if (mode == state.useByMode) return;
+    final data = state.labelData;
+    if (data.useBy == null) return;
+    LabelData updated = data;
+    if (mode == UseByMode.hours) {
+      final start = _useByStart(data);
+      if (start != null) {
+        updated = _withUseBy(data, start.add(useByDuration(state.useByAmount)));
+      }
+    }
+    state = state.copyWith(
+      useByMode: mode,
+      labelData: updated,
+      resultMessage: () => null,
+    );
+  }
+
+  /// Sets Use By to an absolute date/time the user picked (dateTime mode).
+  void updateUseByDateTime(DateTime value) {
+    final data = state.labelData;
+    if (data.useBy == null) return;
+    state = state.copyWith(
+      labelData: _withUseBy(data, value),
+      resultMessage: () => null,
+    );
+  }
+
   void reset() {
     state = LabelPrintState(
       labelData: _freshData(state.fullTemplate, foodName: null),
@@ -435,7 +499,11 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
         copies: state.quantity,
       );
 
-      await _ref.read(printCountProvider.notifier).increment(state.quantity);
+      // The "labels printed today" badge is only for the custom poke bowl
+      // label — don't count prints of any other template.
+      if (state.labelData is PokeBowlLabelData) {
+        await _ref.read(printCountProvider.notifier).increment(state.quantity);
+      }
 
       // Total Amount (base price + extras) is specific to this one sale —
       // clear it after a successful print so the next label doesn't start

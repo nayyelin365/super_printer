@@ -1,0 +1,788 @@
+<title>Multi-Location Rollout</title>
+<style>
+  :root {
+    --bg: #F4F5F7;
+    --surface: #FFFFFF;
+    --surface-raised: #FFFFFF;
+    --ink: #0E1E2B;
+    --ink-soft: #3B4A56;
+    --muted: #6B7784;
+    --border: #E1E4E8;
+    --border-strong: #C9D1D8;
+    --accent: #F5A623;
+    --accent-ink: #7A4B00;
+    --accent-soft: rgba(245, 166, 35, 0.14);
+    --success: #1FA971;
+    --success-soft: rgba(31, 169, 113, 0.12);
+    --danger: #D64545;
+    --danger-soft: #FDEDED;
+    --danger-border: #EFC2C2;
+    --shadow: 0 1px 2px rgba(14, 30, 43, 0.06), 0 8px 24px rgba(14, 30, 43, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0A161F;
+      --surface: #101E2A;
+      --surface-raised: #142430;
+      --ink: #F4F5F7;
+      --ink-soft: #C7D0D8;
+      --muted: #8592A0;
+      --border: #223140;
+      --border-strong: #2E4152;
+      --accent: #F5A623;
+      --accent-ink: #FFD98A;
+      --accent-soft: rgba(245, 166, 35, 0.16);
+      --success: #33C98A;
+      --success-soft: rgba(51, 201, 138, 0.14);
+      --danger: #FF7B7B;
+      --danger-soft: rgba(214, 69, 69, 0.16);
+      --danger-border: rgba(255, 123, 123, 0.35);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0A161F;
+    --surface: #101E2A;
+    --surface-raised: #142430;
+    --ink: #F4F5F7;
+    --ink-soft: #C7D0D8;
+    --muted: #8592A0;
+    --border: #223140;
+    --border-strong: #2E4152;
+    --accent: #F5A623;
+    --accent-ink: #FFD98A;
+    --accent-soft: rgba(245, 166, 35, 0.16);
+    --success: #33C98A;
+    --success-soft: rgba(51, 201, 138, 0.14);
+    --danger: #FF7B7B;
+    --danger-soft: rgba(214, 69, 69, 0.16);
+    --danger-border: rgba(255, 123, 123, 0.35);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  code, .mono, .tag, .field, .phase-num, .stamp {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- header / label strip ---------- */
+
+  .label-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 52px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+  }
+
+  .brand-mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: var(--ink);
+    display: grid;
+    place-items: center;
+    color: var(--accent);
+    font-size: 14px;
+  }
+
+  .doc-id {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    border: 1px dashed var(--border-strong);
+    padding: 5px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 5px 12px 5px 10px;
+    margin-bottom: 22px;
+  }
+
+  .eyebrow .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  h1 {
+    font-size: 42px;
+    line-height: 1.08;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+    max-width: 15ch;
+  }
+
+  .dek {
+    font-size: 19px;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0 0 8px;
+    text-wrap: pretty;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+    margin-top: 26px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  .meta-row strong {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { margin-top: 56px; }
+
+  h2 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 18px;
+  }
+
+  h2 .num {
+    color: var(--accent-ink);
+    margin-right: 8px;
+  }
+
+  h3 {
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+
+  p { margin: 0 0 14px; color: var(--ink-soft); }
+  p:last-child { margin-bottom: 0; }
+  strong { color: var(--ink); }
+
+  .field {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 0.9em;
+    color: var(--ink);
+  }
+
+  /* ---------- decision cards ---------- */
+
+  .decisions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 640px) {
+    .decisions { grid-template-columns: 1fr; }
+  }
+
+  .decision-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: var(--shadow);
+  }
+
+  .decided-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--success);
+    background: var(--success-soft);
+    border-radius: 999px;
+    padding: 4px 10px;
+    margin-bottom: 14px;
+  }
+
+  .decided-tag::before {
+    content: "✓";
+    font-size: 11px;
+  }
+
+  .decision-card h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    color: var(--ink);
+  }
+
+  .decision-card p { font-size: 14.5px; margin-bottom: 0; }
+
+  /* ---------- label mockup (batch code before/after) ---------- */
+
+  .label-compare {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 18px;
+    margin: 26px 0 8px;
+  }
+
+  @media (max-width: 640px) {
+    .label-compare { grid-template-columns: 1fr; }
+    .label-compare .arrow { transform: rotate(90deg); justify-self: center; }
+  }
+
+  .thermal-label {
+    background: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 16px 18px;
+    position: relative;
+  }
+
+  .thermal-label::before {
+    content: attr(data-kicker);
+    display: block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .thermal-label .qr {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 30px;
+    height: 30px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 4px;
+    background:
+      linear-gradient(var(--ink) 30%, transparent 0) 0 0/10px 10px,
+      linear-gradient(var(--ink) 30%, transparent 0) 100% 0/10px 10px no-repeat,
+      linear-gradient(var(--ink) 30%, transparent 0) 0 100%/10px 10px no-repeat;
+    background-color: transparent;
+    opacity: 0.55;
+  }
+
+  .thermal-label .code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    padding-right: 34px;
+  }
+
+  .thermal-label .code .seg-new {
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border-radius: 4px;
+    padding: 1px 3px;
+  }
+
+  .arrow { color: var(--muted); font-size: 20px; }
+
+  /* ---------- settings form mockup ---------- */
+
+  .settings-mock {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-top: 24px;
+  }
+
+  .settings-mock-head {
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .settings-mock-head::before {
+    content: "⚙";
+    color: var(--accent-ink);
+  }
+
+  .settings-mock-body {
+    padding: 22px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  @media (max-width: 640px) {
+    .settings-mock-body { grid-template-columns: 1fr; }
+  }
+
+  .mock-field { display: flex; flex-direction: column; gap: 6px; }
+  .mock-field.span-2 { grid-column: 1 / -1; }
+
+  .mock-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+
+  .mock-field .box {
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: var(--ink-soft);
+    background: var(--bg);
+  }
+
+  .mock-field .box.filled { color: var(--ink); }
+
+  .settings-mock-foot {
+    padding: 16px 22px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .mock-btn {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #2A1B00;
+    background: var(--accent);
+    border-radius: 8px;
+    padding: 9px 18px;
+  }
+
+  /* ---------- phase timeline ---------- */
+
+  .timeline {
+    position: relative;
+    padding-left: 40px;
+  }
+
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 8px;
+    bottom: 8px;
+    width: 1.5px;
+    background: var(--border-strong);
+  }
+
+  .phase {
+    position: relative;
+    padding-bottom: 30px;
+  }
+
+  .phase:last-child { padding-bottom: 0; }
+
+  .phase-num {
+    position: absolute;
+    left: -40px;
+    top: 0;
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 600;
+    display: grid;
+    place-items: center;
+  }
+
+  .phase.is-first .phase-num {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #2A1B00;
+  }
+
+  .phase-title {
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 4px;
+    color: var(--ink);
+  }
+
+  .phase-body { font-size: 14.5px; color: var(--ink-soft); }
+
+  /* ---------- checklist grid ---------- */
+
+  .touchpoints {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 640px) {
+    .touchpoints { grid-template-columns: 1fr; }
+  }
+
+  .touch-col {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+  }
+
+  .touch-col h4 {
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .touch-col.changes h4 { color: var(--accent-ink); }
+  .touch-col.same h4 { color: var(--success); }
+
+  .touch-col ul { margin: 0; padding: 0; list-style: none; }
+
+  .touch-col li {
+    font-size: 14px;
+    color: var(--ink-soft);
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .touch-col li:first-child { border-top: none; padding-top: 0; }
+
+  /* ---------- warning callout (matches the app's own Attention box) ---------- */
+
+  .attention {
+    display: flex;
+    gap: 14px;
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-border);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+
+  .attention .icon {
+    flex: none;
+    color: var(--danger);
+    font-size: 20px;
+    line-height: 1;
+    margin-top: 1px;
+  }
+
+  .attention strong { color: var(--danger); display: block; margin-bottom: 6px; font-size: 15px; }
+  .attention p { color: var(--ink-soft); font-size: 14.5px; margin-bottom: 0; }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    margin-top: 64px;
+    padding-top: 22px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  @media print {
+    body { background: #fff; }
+    .doc { max-width: none; padding: 0 8mm; }
+  }
+</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<div class="doc">
+
+  <div class="label-strip">
+    <div class="brand">
+      <span class="brand-mark">🏷</span>
+      FlavorHub Ops
+    </div>
+    <div class="doc-id">PLAN&nbsp;·&nbsp;MULTI-LOC&nbsp;·&nbsp;R2</div>
+  </div>
+
+  <div class="eyebrow"><span class="dot"></span> Architecture proposal</div>
+  <h1>Giving every kitchen its own floor</h1>
+  <p class="dek">
+    Right now the app runs as one shared kitchen: one employee roster, one
+    batch counter, one receiving log. This plan splits that into per-location
+    rooms — each location gets its own staff, its own Sushi Rice batches, its
+    own receiving log — while every screen, printer, and alarm keeps working
+    exactly as it does today.
+  </p>
+  <div class="meta-row">
+    <span><strong>Scope</strong> Employees · Sushi Rice SOP · Receiving Log · Log Sheet</span>
+    <span><strong>Shipped in</strong> 6 independent phases</span>
+    <span><strong>New infrastructure</strong> None — same Firebase project</span>
+  </div>
+
+  <section>
+    <h2><span class="num">01</span>Two calls we made up front</h2>
+    <div class="decisions">
+      <div class="decision-card">
+        <span class="decided-tag">Decided</span>
+        <h4>One shared database, tagged by location</h4>
+        <p>
+          Every record gets a <span class="field">kitchenLocationId</span>.
+          No new Firebase project to stand up, no config to switch when a
+          device moves between locations — the app just asks which kitchen
+          it's for once, and filters from there.
+        </p>
+      </div>
+      <div class="decision-card">
+        <span class="decided-tag">Decided</span>
+        <h4>UI-level separation, for now</h4>
+        <p>
+          Locations stay invisible to each other on screen. There's no login
+          system today, so this isn't a hard security wall — see the note
+          below before this ships to anyone outside the business.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>What a batch code looks like after</h2>
+    <p>
+      Sushi Rice and Receiving Log codes get printed on real thermal labels
+      and QR codes that can leave the building. Today's format only knows
+      the date, so two kitchens making rice on the same day would print
+      identical batch numbers. Each location gets a short code baked into
+      every printed ID from here on.
+    </p>
+    <div class="label-compare">
+      <div class="thermal-label" data-kicker="Today — one shared counter">
+        <div class="qr"></div>
+        <div class="code">RICA-0908-01</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="thermal-label" data-kicker="After — one counter per kitchen">
+        <div class="qr"></div>
+        <div class="code">RICA-<span class="seg-new">PTC</span>-0908-01</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>How a new kitchen gets on the roster</h2>
+    <p>
+      A device isn't handed a location — it registers one, from
+      <strong>Settings → Kitchen Location</strong>. The first device at a
+      brand-new site fills this in once; every device after that just picks
+      the name from a list. That list, and this form, is also what the
+      sidebar switcher and the first-launch screen both reuse — one form,
+      three doors in from the app.
+    </p>
+    <div class="settings-mock">
+      <div class="settings-mock-head">Settings — Register this location</div>
+      <div class="settings-mock-body">
+        <div class="mock-field span-2">
+          <label>Location name</label>
+          <div class="box filled">Port Clinton</div>
+        </div>
+        <div class="mock-field span-2">
+          <label>Address</label>
+          <div class="box">1420 E Perry St, Port Clinton, OH</div>
+        </div>
+        <div class="mock-field">
+          <label>Phone</label>
+          <div class="box">(419) 555-0142</div>
+        </div>
+        <div class="mock-field">
+          <label>Email</label>
+          <div class="box">portclinton@flavorhub.com</div>
+        </div>
+      </div>
+      <div class="settings-mock-foot">
+        <span class="mock-btn">Register &amp; use this location</span>
+      </div>
+    </div>
+    <p style="margin-top: 18px;">
+      Once registered, that location shows up everywhere a location gets
+      chosen — including a new <strong>"Location"</strong> field on the
+      employee form, so an employee is matched to a kitchen by a deliberate
+      choice at hire time, not just wherever the device happened to be.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>How the rollout is staged</h2>
+    <p>
+      Each phase ships and gets used on its own before the next one starts.
+      Nothing downstream depends on a phase that hasn't been confirmed
+      working with real data first.
+    </p>
+    <div class="timeline">
+      <div class="phase is-first">
+        <div class="phase-num">1</div>
+        <div class="phase-title">Foundation — register &amp; pick a kitchen</div>
+        <div class="phase-body">
+          The location list, the Settings registration form, the first-run
+          gate, a switcher in the sidebar. Nothing is filtered yet — every
+          screen still shows everything, so there's zero risk to what's
+          already running.
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-num">2</div>
+        <div class="phase-title">Employees</div>
+        <div class="phase-body">
+          Existing staff get assigned to the current kitchen automatically;
+          the employee form gains a Location field so new hires are matched
+          on purpose, and the roster splits by location from here on.
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-num">3</div>
+        <div class="phase-title">Sushi Rice SOP</div>
+        <div class="phase-body">
+          Batches, the dashboard, and the HACCP log sheet all split by
+          kitchen. Scanning a printed label still works from any device —
+          the code alone is enough to find it.
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-num">4</div>
+        <div class="phase-title">Receiving Log</div>
+        <div class="phase-body">
+          Invoices and their items split by kitchen, including the combined
+          "every item, every invoice" view the list screen uses.
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-num">5</div>
+        <div class="phase-title">Log Sheet</div>
+        <div class="phase-body">
+          The general log entries split by kitchen the same way — the
+          smallest of the four, saved for last on purpose.
+        </div>
+      </div>
+      <div class="phase">
+        <div class="phase-num">6</div>
+        <div class="phase-title">Rules follow-up</div>
+        <div class="phase-body">
+          Register the new location list with Firestore's access rules, and
+          bring the security question below back to the table as its own
+          conversation.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>What changes on screen</h2>
+    <div class="touchpoints">
+      <div class="touch-col changes">
+        <h4>Gets a kitchen filter</h4>
+        <ul>
+          <li>Settings — register a location or switch between them</li>
+          <li>Home screen — pick a kitchen on first launch</li>
+          <li>Sidebar — switch kitchens anytime</li>
+          <li>Employee form — choose a Location when adding staff</li>
+          <li>Employee roster &amp; QR badges</li>
+          <li>Sushi Rice dashboard, batches, HACCP report</li>
+          <li>Receiving Log &amp; its item list</li>
+          <li>Log Sheet entries</li>
+        </ul>
+      </div>
+      <div class="touch-col same">
+        <h4>Stays exactly as is</h4>
+        <ul>
+          <li>Alarms — lives on the device, not the cloud</li>
+          <li>Printer connection &amp; settings — same, per device</li>
+          <li>Label designs and print flow</li>
+          <li>Everything already working today</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>One thing to know before this goes live</h2>
+    <div class="attention">
+      <div class="icon">▲</div>
+      <div>
+        <strong>Attention: this separates kitchens on screen, not on the server.</strong>
+        <p>
+          There's no staff login today, so nothing stops a device from
+          technically reaching another kitchen's data directly — the app
+          just never shows it to you. Fine if every location is the same
+          trusted business. If two locations should never be able to see
+          each other's data even on purpose, that needs a login system
+          added first — a separate project, quoted on its own.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>FlavorHub · Kitchen Operations</span>
+    <span class="mono">Prepared 2026-09-08</span>
+  </footer>
+
+</div>
