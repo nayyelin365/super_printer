@@ -10,12 +10,10 @@ class LogTypeCard extends StatelessWidget {
   final VoidCallback onTap;
 
   IconData get _icon => switch (logType) {
-    LogType.sushiRice => Icons.rice_bowl_outlined,
-    LogType.temperature => Icons.thermostat_outlined,
+    LogType.sushiRicePh => Icons.science_outlined,
+    LogType.sushiBarTemp => Icons.thermostat_outlined,
     LogType.cooling => Icons.ac_unit,
-    LogType.recooling => Icons.replay,
-    LogType.coolPrep => Icons.kitchen_outlined,
-    LogType.thawing => Icons.water_drop_outlined,
+    LogType.riceHotHold => Icons.rice_bowl_outlined,
   };
 
   @override

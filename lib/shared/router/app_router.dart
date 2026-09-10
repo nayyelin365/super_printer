@@ -5,11 +5,16 @@ import '../../features/alarm/presentation/alarm_list_screen.dart';
 import '../../features/food_selection/presentation/food_selection_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/label_printing/presentation/label_print_screen.dart';
-import '../../features/log_sheet/domain/log_type.dart';
-import '../../features/log_sheet/presentation/log_entry_form_screen.dart';
+import '../../features/log_sheet/presentation/cooling_form_screen.dart';
+import '../../features/log_sheet/presentation/cooling_log_screen.dart';
 import '../../features/log_sheet/presentation/log_home_screen.dart';
-import '../../features/log_sheet/presentation/log_sheet_screen.dart';
+import '../../features/log_sheet/presentation/rice_hot_hold_form_screen.dart';
+import '../../features/log_sheet/presentation/rice_hot_hold_log_screen.dart';
+import '../../features/log_sheet/presentation/sushi_bar_temp_form_screen.dart';
+import '../../features/log_sheet/presentation/sushi_bar_temp_log_screen.dart';
 import '../../features/log_sheet/presentation/sushi_rice_batch_detail_screen.dart';
+import '../../features/log_sheet/presentation/sushi_rice_ph_form_screen.dart';
+import '../../features/log_sheet/presentation/sushi_rice_ph_log_screen.dart';
 import '../../features/log_sheet/presentation/sushi_rice_dashboard_screen.dart';
 import '../../features/log_sheet/presentation/sushi_rice_new_batch_screen.dart';
 import '../../features/log_sheet/presentation/sushi_rice_ph_log_sheet_screen.dart';
@@ -67,14 +72,36 @@ GoRouter createAppRouter() => GoRouter(
         GoRoute(path: '/settings', builder: (context, state) => const PrinterSettingsScreen()),
         GoRoute(path: '/logs', builder: (context, state) => const LogHomeScreen()),
         GoRoute(
-          path: '/logs/:logType',
-          builder: (context, state) =>
-              LogSheetScreen(logType: LogType.values.byName(state.pathParameters['logType']!)),
+          path: '/logs/sushiRicePh',
+          builder: (context, state) => const SushiRicePhLogScreen(),
         ),
         GoRoute(
-          path: '/logs/:logType/entry',
-          builder: (context, state) =>
-              LogEntryFormScreen(logType: LogType.values.byName(state.pathParameters['logType']!)),
+          path: '/logs/sushiRicePh/entry',
+          builder: (context, state) => const SushiRicePhFormScreen(),
+        ),
+        GoRoute(
+          path: '/logs/sushiBarTemp',
+          builder: (context, state) => const SushiBarTempLogScreen(),
+        ),
+        GoRoute(
+          path: '/logs/sushiBarTemp/entry',
+          builder: (context, state) => const SushiBarTempFormScreen(),
+        ),
+        GoRoute(
+          path: '/logs/cooling',
+          builder: (context, state) => const CoolingLogScreen(),
+        ),
+        GoRoute(
+          path: '/logs/cooling/entry',
+          builder: (context, state) => const CoolingFormScreen(),
+        ),
+        GoRoute(
+          path: '/logs/riceHotHold',
+          builder: (context, state) => const RiceHotHoldLogScreen(),
+        ),
+        GoRoute(
+          path: '/logs/riceHotHold/entry',
+          builder: (context, state) => const RiceHotHoldFormScreen(),
         ),
         GoRoute(
           path: '/logs/sushiRice/dashboard',

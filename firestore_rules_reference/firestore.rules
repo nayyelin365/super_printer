@@ -1,11 +1,22 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Log Sheet feature
-    match /logs/{logId} {
+    // Log Sheet feature — the four structured kitchen logs (Sushi Rice pH,
+    // Sushi Bar Temp, Cooling, Rice Hot Holding) share one collection,
+    // filtered by the `logType` field; ids are `<PREFIX>-MMDDYYYY#####`
+    // from a per-day/per-type counter doc.
+    match /log_records/{recordId} {
+      allow read, write: if true;
+    }
+    match /log_record_counters/{counterKey} {
       allow read, write: if true;
     }
     match /log_locations/{locationId} {
+      allow read, write: if true;
+    }
+    // Legacy — retired generic single-shape log system, kept so any
+    // existing docs stay readable. Nothing in the app writes here anymore.
+    match /logs/{logId} {
       allow read, write: if true;
     }
     match /log_counters/{dateKey} {

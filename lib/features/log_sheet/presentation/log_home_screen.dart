@@ -7,7 +7,7 @@ import 'log_type_list_screen.dart';
 
 /// Routed at `/logs` — hosts the two Log Sheet tabs: "Item Lists" (the
 /// existing Food feature, reused as-is via [FoodSelectionScreen] rather
-/// than a separate food-management UI) and "Log Sheet" (the six log-type
+/// than a separate food-management UI) and "Log Sheet" (the four log-type
 /// cards, [LogTypeListScreen]).
 class LogHomeScreen extends ConsumerStatefulWidget {
   const LogHomeScreen({super.key});
@@ -42,7 +42,7 @@ class _LogHomeScreenState extends ConsumerState<LogHomeScreen> {
                     ),
                   ),
                   // Only the Item Lists tab manages food entries — the Log
-                  // Sheet tab's six log types are a fixed set, not addable.
+                  // Sheet tab's four log types are a fixed set, not addable.
                   if (_tabIndex == 0)
                     OutlinedButton.icon(
                       onPressed: () => showAddFoodDialog(context, ref),

@@ -174,6 +174,7 @@ class PrintDetailsPanel extends ConsumerWidget {
                   style: const TextStyle(fontSize: 11, color: Colors.black45),
                 ),
                 Switch(
+                  key: const Key('useByModeSwitch'),
                   value: state.useByMode == UseByMode.dateTime,
                   onChanged: (on) => controller.setUseByMode(
                     on ? UseByMode.dateTime : UseByMode.hours,
@@ -232,6 +233,7 @@ class PrintDetailsPanel extends ConsumerWidget {
                   child: Text('Show Barcode', style: TextStyle(fontSize: 13)),
                 ),
                 Switch(
+                  key: const Key('showBarcodeSwitch'),
                   value: pokeBowl.showBarcode,
                   onChanged: controller.toggleShowBarcode,
                 ),

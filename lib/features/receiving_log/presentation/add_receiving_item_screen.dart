@@ -8,7 +8,7 @@ import '../../../shared/utils/network_error.dart';
 import '../../food_selection/presentation/food_selection_controller.dart';
 import '../../label_printing/domain/label_template.dart';
 import '../../label_printing/presentation/label_print_controller.dart';
-import '../../log_sheet/presentation/log_controller.dart';
+import '../../log_sheet/presentation/log_record_controller.dart';
 import '../domain/receiving_invoice.dart';
 import 'receiving_log_controller.dart';
 

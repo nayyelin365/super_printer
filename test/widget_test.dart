@@ -43,9 +43,10 @@ void main() {
 
     // Poke Bowl-only sections are present.
     expect(find.textContaining('Barcode:'), findsOneWidget);
-    await tester.ensureVisible(find.byType(Switch));
+    final barcodeSwitch = find.byKey(const Key('showBarcodeSwitch'));
+    await tester.ensureVisible(barcodeSwitch);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(Switch));
+    await tester.tap(barcodeSwitch);
     await tester.pumpAndSettle();
     expect(find.textContaining('Barcode:'), findsNothing);
 
@@ -113,7 +114,7 @@ void main() {
     // once toggled on.
     expect(find.text('Show PH'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'PH'), findsNothing);
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byKey(const Key('showPhSwitch')));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextFormField, 'PH'), findsOneWidget);
 

@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../domain/log_type.dart';
 import 'widgets/log_type_card.dart';
 
-/// The "Log Sheet" tab of [LogHomeScreen] — the six log-type cards; tapping
-/// one opens its [LogSheetScreen] at `/logs/:logType`. Just the grid, since
+/// The "Log Sheet" tab of [LogHomeScreen] — the four log-type cards; tapping
+/// one opens its history screen at `/logs/<logType.id>`. Just the grid, since
 /// the title/tabs above it already come from [LogHomeScreen].
 class LogTypeListScreen extends StatelessWidget {
   const LogTypeListScreen({super.key});

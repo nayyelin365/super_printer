@@ -66,6 +66,7 @@ class FoodRotationFieldsEditor extends ConsumerWidget {
               child: Text('Show PH', style: TextStyle(fontSize: 13)),
             ),
             Switch(
+              key: const Key('showPhSwitch'),
               value: data.showPh,
               onChanged: controller.toggleShowPh,
             ),
