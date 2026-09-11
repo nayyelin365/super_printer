@@ -20,8 +20,6 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
   final _formKey = GlobalKey<FormState>();
   int _formGeneration = 0;
 
-  String? _locationId;
-  String _locationName = '';
   String _foodItemName = '';
   String _batchNo = '';
   DateTime? _coolingStart;
@@ -40,8 +38,6 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
   void initState() {
     super.initState();
     final e = _editing;
-    _locationId = e?.locationId;
-    _locationName = e?.locationName ?? '';
     _foodItemName = e?.foodItemName ?? '';
     _batchNo = e?.batchNo ?? '';
     _coolingStart = e?.coolingStart;
@@ -74,8 +70,6 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
     final record = CoolingRecord(
       id: editing?.id ?? '',
       date: _recordDate,
-      locationId: _locationId!,
-      locationName: _locationName,
       foodItemName: _foodItemName.trim(),
       batchNo: _batchNo.trim(),
       coolingStart: _coolingStart,
@@ -154,13 +148,6 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
                             onChanged: (v) => _batchNo = v,
                           ),
                           const SizedBox(height: 12),
-                          LogLocationField(
-                            locationId: _locationId,
-                            onChanged: (id, name) => setState(() {
-                              _locationId = id;
-                              _locationName = name;
-                            }),
-                          ),
                           LogPickerField(
                             label: 'Cooling Start (date & time)',
                             value: _coolingStart == null

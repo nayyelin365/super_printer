@@ -10,6 +10,8 @@ import 'export/log_record_pdf.dart';
 import 'log_record_controller.dart';
 import 'widgets/log_list_view.dart';
 
+String _yn(bool? v) => v == null ? '-' : (v ? 'Yes' : 'No');
+
 /// Routed at `/logs/sushiRicePh` — history of the standalone daily Sushi
 /// Rice pH form (unrelated to the guided Sushi Rice Preparation SOP).
 class SushiRicePhLogScreen extends ConsumerWidget {
@@ -22,18 +24,18 @@ class SushiRicePhLogScreen extends ConsumerWidget {
       columns: [
         LogColumn('Date', (r) => r.dateLabel),
         LogColumn('Batch No.', (r) => r.riceBatchNo),
-        LogColumn('Meter Calibrated', (r) => r.phMeterCalibrated ? 'Yes' : 'No'),
+        LogColumn('Meter Calibrated', (r) => _yn(r.phMeterCalibrated), narrow: true),
         LogColumn('Start Cooking', (r) => r.timeStartCooking.labelOrDash),
         LogColumn('Cooked', (r) => r.timeCooked.labelOrDash),
         LogColumn('Acidified', (r) => r.timeAcidified.labelOrDash),
-        LogColumn('Rice pH', (r) => r.ricePhLabel, numeric: true),
-        LogColumn('In Range?', (r) => r.inRange ? 'Yes' : 'No'),
-        LogColumn('pH After Correction', (r) => r.phAfterCorrectedLabel),
-        LogColumn('In Range After?', (r) => r.inRangeAfterCorrection ? 'Yes' : 'No'),
-        LogColumn('Discarded?', (r) => r.discardOutOfRangeRice ? 'Yes' : 'No'),
+        LogColumn('Rice pH', (r) => r.ricePhLabel, numeric: true, narrow: true),
+        LogColumn('In Range?', (r) => _yn(r.inRange), narrow: true),
+        LogColumn('pH After Correction', (r) => r.phAfterCorrectedLabel, numeric: true, narrow: true),
+        LogColumn('In Range After?', (r) => _yn(r.inRangeAfterCorrection), narrow: true),
+        LogColumn('Discarded?', (r) => _yn(r.discardOutOfRangeRice), narrow: true),
         LogColumn('All Used', (r) => r.timeRiceAllUsed.labelOrDash),
         LogColumn('Discard After Expiry', (r) => r.discardTimeAfterExpiry.labelOrDash),
-        LogColumn('Tester', (r) => r.initials),
+        LogColumn('Tester', (r) => r.initials, narrow: true),
       ],
       onAdd: () {
         ref.read(editingLogRecordProvider.notifier).state = null;

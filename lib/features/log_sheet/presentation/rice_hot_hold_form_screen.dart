@@ -21,8 +21,6 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
   final _formKey = GlobalKey<FormState>();
   int _formGeneration = 0;
 
-  String? _locationId;
-  String _locationName = '';
   String _foodItemName = '';
   String _batchNo = '';
   DateTime? _start;
@@ -30,6 +28,8 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
   late Map<int, DayTime?> _checkTimes;
   late Map<int, String> _checkTemps;
   late Map<int, String> _checkInitials;
+  DayTime? _finishedTime;
+  DayTime? _discardTime;
   String _correctiveAction = '';
   String _initials = '';
   bool _isSaving = false;
@@ -40,12 +40,12 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
   void initState() {
     super.initState();
     final e = _editing;
-    _locationId = e?.locationId;
-    _locationName = e?.locationName ?? '';
     _foodItemName = e?.foodItemName ?? '';
     _batchNo = e?.batchNo ?? '';
     _start = e?.start;
     _actualTemp = e?.actualTempF?.toString() ?? '';
+    _finishedTime = e?.finishedTime;
+    _discardTime = e?.discardTime;
     _correctiveAction = e?.correctiveAction ?? '';
     _initials = e?.initials ?? '';
     _checkTimes = {for (final h in riceHotHoldOffsets) h: e?.checkAt(h).time};
@@ -73,8 +73,6 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
     final record = RiceHotHoldRecord(
       id: editing?.id ?? '',
       date: _recordDate,
-      locationId: _locationId!,
-      locationName: _locationName,
       foodItemName: _foodItemName.trim(),
       batchNo: _batchNo.trim(),
       start: _start,
@@ -88,6 +86,8 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
             initials: (_checkInitials[h] ?? '').trim(),
           ),
       ],
+      finishedTime: _finishedTime,
+      discardTime: _discardTime,
       correctiveAction: _correctiveAction.trim(),
       initials: _initials.trim(),
       createdAt: editing?.createdAt,
@@ -112,6 +112,8 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
         _batchNo = '';
         _start = null;
         _actualTemp = '';
+        _finishedTime = null;
+        _discardTime = null;
         _correctiveAction = '';
         _checkTimes = {for (final h in riceHotHoldOffsets) h: null};
         _checkTemps = {for (final h in riceHotHoldOffsets) h: ''};
@@ -154,13 +156,6 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
                             onChanged: (v) => _batchNo = v,
                           ),
                           const SizedBox(height: 12),
-                          LogLocationField(
-                            locationId: _locationId,
-                            onChanged: (id, name) => setState(() {
-                              _locationId = id;
-                              _locationName = name;
-                            }),
-                          ),
                           LogPickerField(
                             label: 'Start (date & time)',
                             value: _start == null
@@ -215,6 +210,28 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
                             ),
                           ],
                           const Divider(height: 24),
+                          LogPickerField(
+                            label: 'Finished Time',
+                            value: _finishedTime?.label ?? 'Not set',
+                            onTap: () async {
+                              final t = await pickLogTime(context, _finishedTime);
+                              if (t != null) setState(() => _finishedTime = t);
+                            },
+                            onClear: _finishedTime == null
+                                ? null
+                                : () => setState(() => _finishedTime = null),
+                          ),
+                          LogPickerField(
+                            label: 'Discard Time',
+                            value: _discardTime?.label ?? 'Not set',
+                            onTap: () async {
+                              final t = await pickLogTime(context, _discardTime);
+                              if (t != null) setState(() => _discardTime = t);
+                            },
+                            onClear: _discardTime == null
+                                ? null
+                                : () => setState(() => _discardTime = null),
+                          ),
                           const LogFieldLabel('Corrective Action'),
                           TextFormField(
                             initialValue: _correctiveAction,

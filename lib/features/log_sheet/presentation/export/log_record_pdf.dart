@@ -7,6 +7,29 @@ import '../../domain/log_record.dart';
 import '../../domain/log_type.dart';
 import 'log_record_layout.dart';
 
+/// Sizes each column mainly by its actual **values**, not its header — a
+/// long header (e.g. "Results in range (4.1, max 4.2)?") can wrap onto a
+/// second header line for free, but a short, fixed-shape value like a date
+/// or a pH reading looks broken wrapped mid-word. Giving every long-header
+/// column outsized width to fit its header on one line was squeezing the
+/// genuinely value-heavy columns (Date, Rice pH) down to just a few points
+/// on a wide table like this one — capping the header's contribution fixes
+/// that without needing a column-by-column override.
+Map<int, pw.TableColumnWidth> _columnWidths(LogExportLayout layout) {
+  const headerContributionCap = 10;
+  return {
+    for (var i = 0; i < layout.headers.length; i++)
+      i: pw.FlexColumnWidth(
+        [
+          layout.rows.isEmpty
+              ? 0
+              : layout.rows.map((r) => r[i].length).reduce((a, b) => a > b ? a : b),
+          layout.headers[i].replaceAll('\n', ' ').length.clamp(0, headerContributionCap),
+        ].reduce((a, b) => a > b ? a : b).clamp(4, 20).toDouble(),
+      ),
+  };
+}
+
 /// Builds the landscape, multi-page PDF table for one log's records —
 /// matching the Excel export and the paper form. Shared by
 /// [shareLogRecordPdf] and [printLogRecordPdf] so both render identically.
@@ -34,6 +57,7 @@ pw.Document _buildPdfDocument(LogExportLayout layout) {
           pw.TableHelper.fromTextArray(
             headers: [for (final h in layout.headers) h.replaceAll('\n', ' ')],
             data: layout.rows,
+            columnWidths: _columnWidths(layout),
             cellStyle: const pw.TextStyle(fontSize: 8),
             headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),

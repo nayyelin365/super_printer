@@ -9,12 +9,18 @@ import '../log_record_controller.dart';
 
 enum _ShareFormat { excel, pdf }
 
-/// One spreadsheet column for a log's history table.
+/// One spreadsheet column for a log's history table. [narrow] pins the
+/// cell to a small fixed width — for columns whose values are always short
+/// (Yes/No, a 2-digit reading, an initial) so they don't take the same
+/// width as a free-text column like "Corrective Action"; see
+/// `_columnWidths` in `log_record_pdf.dart` for the equivalent on the PDF
+/// export.
 class LogColumn<T extends LogRecord> {
-  const LogColumn(this.label, this.value, {this.numeric = false});
+  const LogColumn(this.label, this.value, {this.numeric = false, this.narrow = false});
   final String label;
   final String Function(T record) value;
   final bool numeric;
+  final bool narrow;
 }
 
 /// Shared history screen for all four logs — a sticky header (back / title /
@@ -221,6 +227,19 @@ class _Table<T extends LogRecord> extends StatelessWidget {
   final void Function(T record) onEdit;
   final void Function(T record) onDelete;
 
+  static const double _narrowWidth = 64;
+  static const double _normalWidth = 90;
+
+  /// Every column — narrow or not — wraps onto a second line instead of
+  /// truncating with an ellipsis when it doesn't fit; ellipsis only kicks
+  /// in as a last resort past 2 lines.
+  Widget _wrapped(String text, {required bool narrow}) {
+    return SizedBox(
+      width: narrow ? _narrowWidth : _normalWidth,
+      child: Text(text, maxLines: 3, overflow: TextOverflow.ellipsis, softWrap: true,style: const TextStyle(fontSize: 12)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -230,9 +249,25 @@ class _Table<T extends LogRecord> extends StatelessWidget {
         child: DataTable(
           headingRowColor: WidgetStatePropertyAll(AppTheme.surface),
           border: TableBorder.all(color: AppTheme.border),
+          // Tight by default (the Flutter defaults — 56/24 — are sized for
+          // a handful of wide columns; these tables run a dozen-plus
+          // mostly-short ones) so short columns don't inherit padding sized
+          // for long free-text ones, and the whole table needs less
+          // horizontal scrolling to read.
+          columnSpacing: 20,
+          horizontalMargin: 12,
+          // Tall enough for a narrow column's label/value to wrap onto a
+          // second line — wrapping reads better than an ellipsis cutting
+          // off a Yes/No or short reading.
+          headingRowHeight: 52,
+          dataRowMinHeight: 36,
+          dataRowMaxHeight: 52,
           columns: [
             for (final column in columns)
-              DataColumn(label: Text(column.label), numeric: column.numeric),
+              DataColumn(
+                label: _wrapped(column.label, narrow: column.narrow),
+                numeric: column.numeric,
+              ),
             const DataColumn(label: Text('')),
           ],
           rows: [
@@ -240,7 +275,8 @@ class _Table<T extends LogRecord> extends StatelessWidget {
               DataRow(
                 onSelectChanged: (_) => onEdit(record),
                 cells: [
-                  for (final column in columns) DataCell(Text(column.value(record))),
+                  for (final column in columns)
+                    DataCell(_wrapped(column.value(record), narrow: column.narrow)),
                   DataCell(
                     IconButton(
                       onPressed: () => onDelete(record),

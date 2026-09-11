@@ -40,15 +40,12 @@ void main() {
       final record = SushiRicePhRecord(
         id: 'r1',
         date: DateTime(2026, 8, 23),
-        locationId: 'loc1',
-        locationName: "Bassett's Market",
         phMeterCalibrated: true,
         riceBatchNo: 'Batch-2026-0002',
         timeStartCooking: const DayTime(8, 0),
         timeCooked: const DayTime(8, 40),
         timeAcidified: const DayTime(9, 0),
         ricePh: 4.1,
-        inRange: true,
         phAfterCorrected: 4.0,
         amountAddingVinegar: '50 ml',
         inRangeAfterCorrection: true,
@@ -75,39 +72,84 @@ void main() {
       expect(restored.createdAt, DateTime.fromMillisecondsSinceEpoch(1000));
     });
 
-    test('omits null optional times from the stored map', () {
+    test('omits null optional times/answers from the stored map', () {
       final record = SushiRicePhRecord(
         id: '',
         date: DateTime(2026, 8, 23),
-        locationId: 'l',
-        locationName: 'x',
       );
       final map = record.toMap();
       expect(map.containsKey('timeStartCookingMin'), isFalse);
       expect(map.containsKey('ricePh'), isFalse);
+      expect(map.containsKey('phMeterCalibrated'), isFalse);
+    });
+
+    test('Yes/No fields default to null (unanswered), not false', () {
+      final record = SushiRicePhRecord(id: '', date: DateTime.now());
+      expect(record.phMeterCalibrated, isNull);
+      expect(record.inRangeAfterCorrection, isNull);
+      expect(record.discardOutOfRangeRice, isNull);
+    });
+
+    test('inRange is derived from ricePh against the 4.2 threshold, not stored', () {
+      SushiRicePhRecord withPh(double? ph) =>
+          SushiRicePhRecord(id: '', date: DateTime(2026, 8, 23), ricePh: ph);
+
+      expect(withPh(null).inRange, isNull);
+      expect(withPh(4.1).inRange, isTrue);
+      expect(withPh(4.2).inRange, isTrue);
+      expect(withPh(4.3).inRange, isFalse);
+      expect(withPh(4.3).toMap().containsKey('inRange'), isFalse);
     });
   });
 
   group('SushiBarTempRecord', () {
-    test('round-trips including the time slot enum', () {
+    test('round-trips including the time slot enum and a dynamic reading list', () {
       final record = SushiBarTempRecord(
         id: 'r2',
         date: DateTime(2026, 9, 1),
-        locationId: 'l',
-        locationName: "Miller's Market",
         timeSlot: TempTimeSlot.threePm,
-        displayCaseTempF: 38,
-        coolerTempF: 40,
-        freezerTempF: 5,
+        readings: const [
+          UnitTempReading(locationId: 'l1', locationName: 'Display Case', tempF: 38),
+          UnitTempReading(locationId: 'l2', locationName: 'Freezer', tempF: 5),
+        ],
         calibrated: true,
         initials: 'AB',
       );
       final restored = SushiBarTempRecord.fromMap('r2', record.toMap());
       expect(restored.timeSlot, TempTimeSlot.threePm);
-      expect(restored.displayCaseTempF, 38);
-      expect(restored.freezerTempF, 5);
+      expect(restored.readingFor('l1')?.tempF, 38);
+      expect(restored.readingFor('l2')?.tempF, 5);
+      expect(restored.readingFor('missing'), isNull);
       expect(restored.calibrated, true);
       expect(restored.timeSortKey, 15 * 60);
+    });
+
+    test('readings list is not fixed to three units — any count works', () {
+      final record = SushiBarTempRecord(
+        id: '',
+        date: DateTime(2026, 9, 1),
+        timeSlot: TempTimeSlot.nineAm,
+        readings: const [
+          UnitTempReading(locationId: 'l1', locationName: 'Unit A', tempF: 30),
+          UnitTempReading(locationId: 'l2', locationName: 'Unit B', tempF: 31),
+          UnitTempReading(locationId: 'l3', locationName: 'Unit C', tempF: 32),
+          UnitTempReading(locationId: 'l4', locationName: 'Unit D', tempF: 33),
+          UnitTempReading(locationId: 'l5', locationName: 'Unit E', tempF: 34),
+        ],
+      );
+      expect(record.readings, hasLength(5));
+      expect(SushiBarTempRecord.fromMap('', record.toMap()).readings, hasLength(5));
+    });
+
+    test('calibrated defaults to null (unanswered), not false', () {
+      final record = SushiBarTempRecord(
+        id: '',
+        date: DateTime(2026, 9, 1),
+        timeSlot: TempTimeSlot.nineAm,
+      );
+      expect(record.calibrated, isNull);
+      expect(record.toMap().containsKey('calibrated'), isFalse);
+      expect(record.readings, isEmpty);
     });
   });
 
@@ -116,8 +158,6 @@ void main() {
       final record = CoolingRecord(
         id: 'r3',
         date: DateTime(2026, 9, 2),
-        locationId: 'l',
-        locationName: 'x',
         foodItemName: 'Cooked Rice',
         batchNo: 'B1',
         coolingStart: DateTime(2026, 9, 2, 12, 0),
@@ -142,8 +182,6 @@ void main() {
       final record = RiceHotHoldRecord.fromMap('r4', {
         'logType': 'riceHotHold',
         'dateMillis': DateTime(2026, 9, 3).millisecondsSinceEpoch,
-        'locationId': 'l',
-        'locationName': 'x',
         'checks': [
           {'hourOffset': 4, 'timeMin': 840, 'tempF': 150, 'initials': 'NL'},
         ],
@@ -157,8 +195,6 @@ void main() {
       final record = RiceHotHoldRecord(
         id: 'r5',
         date: DateTime(2026, 9, 3),
-        locationId: 'l',
-        locationName: 'x',
         foodItemName: 'Sushi Rice',
         start: DateTime(2026, 9, 3, 12, 0),
         actualTempF: 170,
@@ -170,6 +206,26 @@ void main() {
       final restored = RiceHotHoldRecord.fromMap('r5', record.toMap());
       expect(restored.checkAt(8).tempF, 158);
       expect(restored.start, DateTime(2026, 9, 3, 12, 0));
+    });
+
+    test('round-trips finishedTime and discardTime', () {
+      final record = RiceHotHoldRecord(
+        id: 'r6',
+        date: DateTime(2026, 9, 3),
+        finishedTime: const DayTime(20, 0),
+        discardTime: const DayTime(20, 30),
+      );
+      final restored = RiceHotHoldRecord.fromMap('r6', record.toMap());
+      expect(restored.finishedTime, const DayTime(20, 0));
+      expect(restored.discardTime, const DayTime(20, 30));
+    });
+
+    test('finishedTime/discardTime default to unset', () {
+      final record = RiceHotHoldRecord(id: '', date: DateTime(2026, 9, 3));
+      expect(record.finishedTime, isNull);
+      expect(record.discardTime, isNull);
+      expect(record.toMap().containsKey('finishedTimeMin'), isFalse);
+      expect(record.toMap().containsKey('discardTimeMin'), isFalse);
     });
   });
 }

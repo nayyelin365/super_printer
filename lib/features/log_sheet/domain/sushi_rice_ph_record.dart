@@ -1,27 +1,34 @@
 import 'log_record.dart';
 import 'log_type.dart';
 
+/// Rice pH must not exceed this to be "in range" (targeted 4.1, never to
+/// exceed 4.2) — see [SushiRicePhRecord.inRange].
+const sushiRicePhMaxInRange = 4.2;
+
 /// One day/batch column of the paper "Sushi Rice pH Log" — the pH meter
 /// check, cook/acidify times, the pH reading against the 4.1 target
 /// (never to exceed 4.2), any corrective vinegar addition, and the
 /// discard/all-used times.
+///
+/// The three Yes/No fields ([phMeterCalibrated], [inRangeAfterCorrection],
+/// [discardOutOfRangeRice]) are nullable rather than defaulting to false —
+/// an entry the user hasn't answered yet stores/shows as unanswered ("-"),
+/// not a silent "No". [inRange] is not a manual answer at all: it's
+/// derived from [ricePh] against [sushiRicePhMaxInRange] (see [inRange]).
 class SushiRicePhRecord implements LogRecord {
   const SushiRicePhRecord({
     required this.id,
     required this.date,
-    required this.locationId,
-    required this.locationName,
-    this.phMeterCalibrated = false,
+    this.phMeterCalibrated,
     this.riceBatchNo = '',
     this.timeStartCooking,
     this.timeCooked,
     this.timeAcidified,
     this.ricePh,
-    this.inRange = false,
     this.phAfterCorrected,
     this.amountAddingVinegar = '',
-    this.inRangeAfterCorrection = false,
-    this.discardOutOfRangeRice = false,
+    this.inRangeAfterCorrection,
+    this.discardOutOfRangeRice,
     this.timeRiceAllUsed,
     this.discardTimeAfterExpiry,
     this.initials = '',
@@ -33,25 +40,18 @@ class SushiRicePhRecord implements LogRecord {
   final String id;
   @override
   final DateTime date;
-  @override
-  final String locationId;
-  @override
-  final String locationName;
 
-  final bool phMeterCalibrated;
+  final bool? phMeterCalibrated;
   final String riceBatchNo;
   final DayTime? timeStartCooking;
   final DayTime? timeCooked;
   final DayTime? timeAcidified;
   final double? ricePh;
 
-  /// "Targeted pH of 4.1, not to exceed 4.2 — results are in this range?"
-  final bool inRange;
-
   final double? phAfterCorrected;
   final String amountAddingVinegar;
-  final bool inRangeAfterCorrection;
-  final bool discardOutOfRangeRice;
+  final bool? inRangeAfterCorrection;
+  final bool? discardOutOfRangeRice;
   final DayTime? timeRiceAllUsed;
   final DayTime? discardTimeAfterExpiry;
 
@@ -72,21 +72,27 @@ class SushiRicePhRecord implements LogRecord {
   String get ricePhLabel => ricePh?.toStringAsFixed(1) ?? '-';
   String get phAfterCorrectedLabel => phAfterCorrected?.toStringAsFixed(1) ?? '-';
 
+  /// "Targeted pH of 4.1, not to exceed 4.2 — results are in this range?"
+  /// Derived from [ricePh] rather than a separate manual answer — null
+  /// (shown as "-") until a pH is entered, then `ricePh <=
+  /// [sushiRicePhMaxInRange]`. Only when this is false (pH over 4.2) do the
+  /// correction fields ([phAfterCorrected], [amountAddingVinegar],
+  /// [inRangeAfterCorrection], [discardOutOfRangeRice]) apply — see the
+  /// form screen.
+  bool? get inRange => ricePh == null ? null : ricePh! <= sushiRicePhMaxInRange;
+
   SushiRicePhRecord copyWith({
     DateTime? date,
-    String? locationId,
-    String? locationName,
-    bool? phMeterCalibrated,
+    bool? Function()? phMeterCalibrated,
     String? riceBatchNo,
     DayTime? Function()? timeStartCooking,
     DayTime? Function()? timeCooked,
     DayTime? Function()? timeAcidified,
     double? Function()? ricePh,
-    bool? inRange,
     double? Function()? phAfterCorrected,
     String? amountAddingVinegar,
-    bool? inRangeAfterCorrection,
-    bool? discardOutOfRangeRice,
+    bool? Function()? inRangeAfterCorrection,
+    bool? Function()? discardOutOfRangeRice,
     DayTime? Function()? timeRiceAllUsed,
     DayTime? Function()? discardTimeAfterExpiry,
     String? initials,
@@ -94,19 +100,19 @@ class SushiRicePhRecord implements LogRecord {
     return SushiRicePhRecord(
       id: id,
       date: date ?? this.date,
-      locationId: locationId ?? this.locationId,
-      locationName: locationName ?? this.locationName,
-      phMeterCalibrated: phMeterCalibrated ?? this.phMeterCalibrated,
+      phMeterCalibrated:
+          phMeterCalibrated != null ? phMeterCalibrated() : this.phMeterCalibrated,
       riceBatchNo: riceBatchNo ?? this.riceBatchNo,
       timeStartCooking: timeStartCooking != null ? timeStartCooking() : this.timeStartCooking,
       timeCooked: timeCooked != null ? timeCooked() : this.timeCooked,
       timeAcidified: timeAcidified != null ? timeAcidified() : this.timeAcidified,
       ricePh: ricePh != null ? ricePh() : this.ricePh,
-      inRange: inRange ?? this.inRange,
       phAfterCorrected: phAfterCorrected != null ? phAfterCorrected() : this.phAfterCorrected,
       amountAddingVinegar: amountAddingVinegar ?? this.amountAddingVinegar,
-      inRangeAfterCorrection: inRangeAfterCorrection ?? this.inRangeAfterCorrection,
-      discardOutOfRangeRice: discardOutOfRangeRice ?? this.discardOutOfRangeRice,
+      inRangeAfterCorrection:
+          inRangeAfterCorrection != null ? inRangeAfterCorrection() : this.inRangeAfterCorrection,
+      discardOutOfRangeRice:
+          discardOutOfRangeRice != null ? discardOutOfRangeRice() : this.discardOutOfRangeRice,
       timeRiceAllUsed: timeRiceAllUsed != null ? timeRiceAllUsed() : this.timeRiceAllUsed,
       discardTimeAfterExpiry:
           discardTimeAfterExpiry != null ? discardTimeAfterExpiry() : this.discardTimeAfterExpiry,
@@ -120,19 +126,16 @@ class SushiRicePhRecord implements LogRecord {
     return SushiRicePhRecord(
       id: id,
       date: logRecordDateFromMap(data),
-      locationId: data['locationId'] as String? ?? '',
-      locationName: data['locationName'] as String? ?? '',
-      phMeterCalibrated: data['phMeterCalibrated'] as bool? ?? false,
+      phMeterCalibrated: data['phMeterCalibrated'] as bool?,
       riceBatchNo: data['riceBatchNo'] as String? ?? '',
       timeStartCooking: DayTime.fromMinutesOrNull(data['timeStartCookingMin'] as int?),
       timeCooked: DayTime.fromMinutesOrNull(data['timeCookedMin'] as int?),
       timeAcidified: DayTime.fromMinutesOrNull(data['timeAcidifiedMin'] as int?),
       ricePh: (data['ricePh'] as num?)?.toDouble(),
-      inRange: data['inRange'] as bool? ?? false,
       phAfterCorrected: (data['phAfterCorrected'] as num?)?.toDouble(),
       amountAddingVinegar: data['amountAddingVinegar'] as String? ?? '',
-      inRangeAfterCorrection: data['inRangeAfterCorrection'] as bool? ?? false,
-      discardOutOfRangeRice: data['discardOutOfRangeRice'] as bool? ?? false,
+      inRangeAfterCorrection: data['inRangeAfterCorrection'] as bool?,
+      discardOutOfRangeRice: data['discardOutOfRangeRice'] as bool?,
       timeRiceAllUsed: DayTime.fromMinutesOrNull(data['timeRiceAllUsedMin'] as int?),
       discardTimeAfterExpiry:
           DayTime.fromMinutesOrNull(data['discardTimeAfterExpiryMin'] as int?),
@@ -147,19 +150,17 @@ class SushiRicePhRecord implements LogRecord {
     return {
       'logType': logType.id,
       'dateMillis': DateTime(date.year, date.month, date.day).millisecondsSinceEpoch,
-      'locationId': locationId,
-      'locationName': locationName,
-      'phMeterCalibrated': phMeterCalibrated,
+      if (phMeterCalibrated != null) 'phMeterCalibrated': phMeterCalibrated,
       'riceBatchNo': riceBatchNo,
       if (timeStartCooking != null) 'timeStartCookingMin': timeStartCooking!.minutesSinceMidnight,
       if (timeCooked != null) 'timeCookedMin': timeCooked!.minutesSinceMidnight,
       if (timeAcidified != null) 'timeAcidifiedMin': timeAcidified!.minutesSinceMidnight,
       if (ricePh != null) 'ricePh': ricePh,
-      'inRange': inRange,
+      // `inRange` itself isn't stored — it's derived from `ricePh` on read.
       if (phAfterCorrected != null) 'phAfterCorrected': phAfterCorrected,
       'amountAddingVinegar': amountAddingVinegar,
-      'inRangeAfterCorrection': inRangeAfterCorrection,
-      'discardOutOfRangeRice': discardOutOfRangeRice,
+      if (inRangeAfterCorrection != null) 'inRangeAfterCorrection': inRangeAfterCorrection,
+      if (discardOutOfRangeRice != null) 'discardOutOfRangeRice': discardOutOfRangeRice,
       if (timeRiceAllUsed != null) 'timeRiceAllUsedMin': timeRiceAllUsed!.minutesSinceMidnight,
       if (discardTimeAfterExpiry != null)
         'discardTimeAfterExpiryMin': discardTimeAfterExpiry!.minutesSinceMidnight,

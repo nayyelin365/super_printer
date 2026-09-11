@@ -24,14 +24,16 @@ class RiceHotHoldLogScreen extends ConsumerWidget {
         LogColumn('Food Item', (r) => r.foodItemName),
         LogColumn('Batch No', (r) => r.batchNo),
         LogColumn('Start', (r) => r.start == null ? '-' : logFormDateTimeFormat.format(r.start!)),
-        LogColumn('Actual Temp', (r) => RiceHotHoldRecord.tempLabel(r.actualTempF), numeric: true),
+        LogColumn('Actual Temp', (r) => RiceHotHoldRecord.tempLabel(r.actualTempF), numeric: true, narrow: true),
         for (final h in riceHotHoldOffsets) ...[
-          LogColumn('+$h hr Time', (r) => r.checkAt(h).time.labelOrDash),
-          LogColumn('+$h hr Temp', (r) => RiceHotHoldRecord.tempLabel(r.checkAt(h).tempF), numeric: true),
-          LogColumn('+$h hr Init.', (r) => r.checkAt(h).initials),
+          LogColumn('+$h hr Time', (r) => r.checkAt(h).time.labelOrDash, narrow: true),
+          LogColumn('+$h hr Temp', (r) => RiceHotHoldRecord.tempLabel(r.checkAt(h).tempF), numeric: true, narrow: true),
+          LogColumn('+$h hr Init.', (r) => r.checkAt(h).initials, narrow: true),
         ],
+        LogColumn('Finished Time', (r) => r.finishedTime.labelOrDash, narrow: true),
+        LogColumn('Discard Time', (r) => r.discardTime.labelOrDash, narrow: true),
         LogColumn('Corrective Action', (r) => r.correctiveActionLabel),
-        LogColumn('Initial', (r) => r.initials),
+        LogColumn('Initial', (r) => r.initials, narrow: true),
       ],
       onAdd: () {
         ref.read(editingLogRecordProvider.notifier).state = null;

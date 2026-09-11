@@ -23,19 +23,16 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
   int _formGeneration = 0;
 
   late DateTime _date;
-  String? _locationId;
-  String _locationName = '';
-  bool _phMeterCalibrated = false;
+  bool? _phMeterCalibrated;
   String _riceBatchNo = '';
   DayTime? _timeStartCooking;
   DayTime? _timeCooked;
   DayTime? _timeAcidified;
   String _ricePh = '';
-  bool _inRange = false;
   String _phAfterCorrected = '';
   String _amountVinegar = '';
-  bool _inRangeAfterCorrection = false;
-  bool _discardOutOfRange = false;
+  bool? _inRangeAfterCorrection;
+  bool? _discardOutOfRange;
   DayTime? _timeRiceAllUsed;
   DayTime? _discardTimeAfterExpiry;
   String _initials = '';
@@ -43,25 +40,38 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
 
   SushiRicePhRecord? get _editing => ref.read(editingLogRecordProvider) as SushiRicePhRecord?;
 
+  /// Derived from the typed [_ricePh], never a manual answer — null until a
+  /// pH is entered. Only when this is `false` (pH over
+  /// [sushiRicePhMaxInRange]) do the correction fields below apply.
+  bool? get _computedInRange {
+    final value = _num(_ricePh);
+    return value == null ? null : value <= sushiRicePhMaxInRange;
+  }
+
+  static DayTime _now() {
+    final now = DateTime.now();
+    return DayTime(now.hour, now.minute);
+  }
+
   @override
   void initState() {
     super.initState();
     final e = _editing;
     final now = DateTime.now();
     _date = e?.date ?? DateTime(now.year, now.month, now.day);
-    _locationId = e?.locationId;
-    _locationName = e?.locationName ?? '';
-    _phMeterCalibrated = e?.phMeterCalibrated ?? false;
+    _phMeterCalibrated = e?.phMeterCalibrated;
     _riceBatchNo = e?.riceBatchNo ?? '';
-    _timeStartCooking = e?.timeStartCooking;
-    _timeCooked = e?.timeCooked;
+    // Start Cooking / Cooked default to right now for a brand-new entry
+    // (this is usually logged as it happens) rather than a fixed hour —
+    // every other time field here stays unset until picked.
+    _timeStartCooking = e?.timeStartCooking ?? (e == null ? _now() : null);
+    _timeCooked = e?.timeCooked ?? (e == null ? _now() : null);
     _timeAcidified = e?.timeAcidified;
     _ricePh = e?.ricePh?.toString() ?? '';
-    _inRange = e?.inRange ?? false;
     _phAfterCorrected = e?.phAfterCorrected?.toString() ?? '';
     _amountVinegar = e?.amountAddingVinegar ?? '';
-    _inRangeAfterCorrection = e?.inRangeAfterCorrection ?? false;
-    _discardOutOfRange = e?.discardOutOfRangeRice ?? false;
+    _inRangeAfterCorrection = e?.inRangeAfterCorrection;
+    _discardOutOfRange = e?.discardOutOfRangeRice;
     _timeRiceAllUsed = e?.timeRiceAllUsed;
     _discardTimeAfterExpiry = e?.discardTimeAfterExpiry;
     _initials = e?.initials ?? '';
@@ -100,23 +110,25 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
 
+    // The correction fields only apply once pH is actually over range —
+    // if it isn't (or no pH was entered), don't persist stale/irrelevant
+    // answers left over from an earlier edit.
+    final outOfRange = _computedInRange == false;
+
     final editing = _editing;
     final record = SushiRicePhRecord(
       id: editing?.id ?? '',
       date: _date,
-      locationId: _locationId!,
-      locationName: _locationName,
       phMeterCalibrated: _phMeterCalibrated,
       riceBatchNo: _riceBatchNo.trim(),
       timeStartCooking: _timeStartCooking,
       timeCooked: _timeCooked,
       timeAcidified: _timeAcidified,
       ricePh: _num(_ricePh),
-      inRange: _inRange,
-      phAfterCorrected: _num(_phAfterCorrected),
-      amountAddingVinegar: _amountVinegar.trim(),
-      inRangeAfterCorrection: _inRangeAfterCorrection,
-      discardOutOfRangeRice: _discardOutOfRange,
+      phAfterCorrected: outOfRange ? _num(_phAfterCorrected) : null,
+      amountAddingVinegar: outOfRange ? _amountVinegar.trim() : '',
+      inRangeAfterCorrection: outOfRange ? _inRangeAfterCorrection : null,
+      discardOutOfRangeRice: outOfRange ? _discardOutOfRange : null,
       timeRiceAllUsed: _timeRiceAllUsed,
       discardTimeAfterExpiry: _discardTimeAfterExpiry,
       initials: _initials.trim(),
@@ -138,16 +150,16 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
     } else {
       setState(() {
         _formGeneration++;
+        _phMeterCalibrated = null;
         _riceBatchNo = '';
-        _timeStartCooking = null;
-        _timeCooked = null;
+        _timeStartCooking = _now();
+        _timeCooked = _now();
         _timeAcidified = null;
         _ricePh = '';
-        _inRange = false;
         _phAfterCorrected = '';
         _amountVinegar = '';
-        _inRangeAfterCorrection = false;
-        _discardOutOfRange = false;
+        _inRangeAfterCorrection = null;
+        _discardOutOfRange = null;
         _timeRiceAllUsed = null;
         _discardTimeAfterExpiry = null;
       });
@@ -157,6 +169,7 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
   @override
   Widget build(BuildContext context) {
     final isEditing = _editing != null;
+    final inRange = _computedInRange;
     return Scaffold(
       backgroundColor: AppTheme.surface,
       body: SafeArea(
@@ -185,13 +198,6 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
                             value: logFormDateFormat.format(_date),
                             onTap: _pickDate,
                           ),
-                          LogLocationField(
-                            locationId: _locationId,
-                            onChanged: (id, name) => setState(() {
-                              _locationId = id;
-                              _locationName = name;
-                            }),
-                          ),
                           LogYesNoField(
                             label: 'pH Meter Calibrated',
                             value: _phMeterCalibrated,
@@ -216,39 +222,37 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
                             suffix: 'pH',
                             hint: 'e.g. 4.1',
                             formKeySuffix: '$_formGeneration',
-                            onChanged: (v) => _ricePh = v,
+                            onChanged: (v) => setState(() => _ricePh = v),
                           ),
-                          LogYesNoField(
-                            label: 'Targeted pH 4.1 (max 4.2) — in range?',
-                            value: _inRange,
-                            onChanged: (v) => setState(() => _inRange = v),
-                          ),
-                          LogNumberField(
-                            label: 'pH after Corrected',
-                            initialValue: _phAfterCorrected,
-                            suffix: 'pH',
-                            hint: 'e.g. 4.1',
-                            formKeySuffix: '$_formGeneration',
-                            onChanged: (v) => _phAfterCorrected = v,
-                          ),
-                          const LogFieldLabel('Amount Adding More Vinegar'),
-                          TextFormField(
-                            key: ValueKey('vinegar-$_formGeneration'),
-                            initialValue: _amountVinegar,
-                            decoration: const InputDecoration(hintText: 'e.g. 50 ml'),
-                            onChanged: (v) => _amountVinegar = v,
-                          ),
-                          const SizedBox(height: 12),
-                          LogYesNoField(
-                            label: 'In range after correction?',
-                            value: _inRangeAfterCorrection,
-                            onChanged: (v) => setState(() => _inRangeAfterCorrection = v),
-                          ),
-                          LogYesNoField(
-                            label: 'Discard out of Range pH Rice',
-                            value: _discardOutOfRange,
-                            onChanged: (v) => setState(() => _discardOutOfRange = v),
-                          ),
+                          _InRangeStatus(inRange: inRange),
+                          if (inRange == false) ...[
+                            LogNumberField(
+                              label: 'pH after Corrected',
+                              initialValue: _phAfterCorrected,
+                              suffix: 'pH',
+                              hint: 'e.g. 4.1',
+                              formKeySuffix: '$_formGeneration',
+                              onChanged: (v) => _phAfterCorrected = v,
+                            ),
+                            const LogFieldLabel('Amount Adding More Vinegar'),
+                            TextFormField(
+                              key: ValueKey('vinegar-$_formGeneration'),
+                              initialValue: _amountVinegar,
+                              decoration: const InputDecoration(hintText: 'e.g. 50 ml'),
+                              onChanged: (v) => _amountVinegar = v,
+                            ),
+                            const SizedBox(height: 12),
+                            LogYesNoField(
+                              label: 'In range after correction?',
+                              value: _inRangeAfterCorrection,
+                              onChanged: (v) => setState(() => _inRangeAfterCorrection = v),
+                            ),
+                            LogYesNoField(
+                              label: 'Discard out of Range pH Rice',
+                              value: _discardOutOfRange,
+                              onChanged: (v) => setState(() => _discardOutOfRange = v),
+                            ),
+                          ],
                           _time('Time Rice is all Used', _timeRiceAllUsed,
                               (v) => setState(() => _timeRiceAllUsed = v)),
                           _time('Discard Time after Expiry', _discardTimeAfterExpiry,
@@ -273,6 +277,27 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Read-only status line under "Rice pH" — shows the auto-derived in-range
+/// result instead of a manual Yes/No toggle for "Targeted pH 4.1 (max
+/// 4.2) — in range?".
+class _InRangeStatus extends StatelessWidget {
+  const _InRangeStatus({required this.inRange});
+  final bool? inRange;
+
+  @override
+  Widget build(BuildContext context) {
+    final (text, color) = switch (inRange) {
+      null => ('Targeted pH 4.1 (max 4.2) — enter a reading to check', Colors.black45),
+      true => ('In range (≤ 4.2)', AppTheme.success),
+      false => ('Out of range (> 4.2) — correction required below', AppTheme.danger),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
     );
   }
 }

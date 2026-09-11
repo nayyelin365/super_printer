@@ -6,10 +6,12 @@ import '../../domain/sushi_bar_temp_record.dart';
 import '../../domain/sushi_rice_ph_record.dart';
 
 /// A flat, export-ready view of one log's records — the single source both
-/// the Excel and the PDF exporters render, so the two always match. Pivot
-/// logs (Sushi Rice pH, Sushi Bar Temp) put field names in the first column
-/// and one record per column, mirroring the paper form; the other two are
-/// plain one-row-per-record tables.
+/// the Excel and the PDF exporters render, so the two always match. Every
+/// log is a plain one-row-per-record table (fields across as columns, one
+/// record per row) rather than a pivot with one column per record — a
+/// column-per-record layout stops being printable/readable once a log has
+/// dozens or hundreds of entries; a row-per-record table just grows down
+/// the page instead of sideways off it.
 class LogExportLayout {
   LogExportLayout({
     required this.title,
@@ -26,7 +28,7 @@ class LogExportLayout {
   String get fileStem => title.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_');
 }
 
-String _yesNo(bool v) => v ? 'Yes' : 'No';
+String _yesNo(bool? v) => v == null ? '-' : (v ? 'Yes' : 'No');
 String _dt(DateTime? d) => d == null
     ? ''
     : '${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year} '
@@ -39,10 +41,10 @@ String _time12(int h, int m) {
 
 List<String> _infoLines(LogType logType, List<LogRecord> records) {
   final year = records.isEmpty ? DateTime.now().year : records.first.date.year;
-  final stores = records.map((r) => r.locationName).where((n) => n.isNotEmpty).toSet();
   return [
     'Year - $year',
-    'Store / Location - ${stores.isEmpty ? '' : stores.join(', ')}',
+    'Store Name - $logStoreName',
+    'Location - $logStoreLocation',
   ];
 }
 
@@ -55,61 +57,80 @@ LogExportLayout buildLogExportLayout(LogType logType, List<LogRecord> records) {
   };
 }
 
-/// Field label + value-getter, for the pivot layouts.
-typedef _Field<T> = (String, String Function(T));
-
-LogExportLayout _pivot<T extends LogRecord>(
-  LogType logType,
-  List<T> records,
-  List<String> columnHeaders,
-  List<_Field<T>> fields,
-) {
-  return LogExportLayout(
-    title: logType.label,
-    infoLines: _infoLines(logType, records),
-    headers: ['', ...columnHeaders],
-    rows: [
-      for (final field in fields)
-        [field.$1, for (final record in records) field.$2(record)],
-    ],
-  );
-}
-
 LogExportLayout _sushiRicePhLayout(List<SushiRicePhRecord> records) {
-  return _pivot<SushiRicePhRecord>(
-    LogType.sushiRicePh,
-    records,
-    [for (final r in records) r.dateLabel],
-    [
-      ('pH Meter Calibrated', (r) => _yesNo(r.phMeterCalibrated)),
-      ('Rice Batch No.', (r) => r.riceBatchNo),
-      ('Time Rice Start Cooking', (r) => r.timeStartCooking.labelOrDash),
-      ('Time Rice Cooked', (r) => r.timeCooked.labelOrDash),
-      ('Time Acidified', (r) => r.timeAcidified.labelOrDash),
-      ('Rice pH', (r) => r.ricePhLabel),
-      ('Results in range (4.1, max 4.2)?', (r) => _yesNo(r.inRange)),
-      ('pH after Corrected', (r) => r.phAfterCorrectedLabel),
-      ('Amount Adding More Vinegar', (r) => r.amountAddingVinegar),
-      ('Results in range after correction?', (r) => _yesNo(r.inRangeAfterCorrection)),
-      ('Discard out of Range pH Rice', (r) => _yesNo(r.discardOutOfRangeRice)),
-      ('Time Rice is all Used', (r) => r.timeRiceAllUsed.labelOrDash),
-      ('Discard Time after Expiry', (r) => r.discardTimeAfterExpiry.labelOrDash),
-      ("Tester's Initial", (r) => r.initials),
+  return LogExportLayout(
+    title: LogType.sushiRicePh.label,
+    infoLines: _infoLines(LogType.sushiRicePh, records),
+    headers: const [
+      'Date',
+      'pH Meter Calibrated',
+      'Rice Batch No.',
+      'Time Rice Start Cooking',
+      'Time Rice Cooked',
+      'Time Acidified',
+      'Rice pH',
+      'Results in range (4.1, max 4.2)?',
+      'pH after Corrected',
+      'Amount Adding More Vinegar',
+      'Results in range after correction?',
+      'Discard out of Range pH Rice',
+      'Time Rice is all Used',
+      'Discard Time after Expiry',
+      "Tester's Initial",
+    ],
+    rows: [
+      for (final r in records)
+        [
+          r.dateLabel,
+          _yesNo(r.phMeterCalibrated),
+          r.riceBatchNo,
+          r.timeStartCooking.labelOrDash,
+          r.timeCooked.labelOrDash,
+          r.timeAcidified.labelOrDash,
+          r.ricePhLabel,
+          _yesNo(r.inRange),
+          r.phAfterCorrectedLabel,
+          r.amountAddingVinegar,
+          _yesNo(r.inRangeAfterCorrection),
+          _yesNo(r.discardOutOfRangeRice),
+          r.timeRiceAllUsed.labelOrDash,
+          r.discardTimeAfterExpiry.labelOrDash,
+          r.initials,
+        ],
     ],
   );
 }
 
 LogExportLayout _sushiBarTempLayout(List<SushiBarTempRecord> records) {
-  return _pivot<SushiBarTempRecord>(
-    LogType.sushiBarTemp,
-    records,
-    [for (final r in records) '${r.dateLabel}\n${r.timeSlot.label}'],
-    [
-      ('Display Case', (r) => SushiBarTempRecord.tempLabel(r.displayCaseTempF)),
-      ('Cooler', (r) => SushiBarTempRecord.tempLabel(r.coolerTempF)),
-      ('Freezer', (r) => SushiBarTempRecord.tempLabel(r.freezerTempF)),
-      ('Calibration', (r) => _yesNo(r.calibrated)),
-      ('Initial', (r) => r.initials),
+  // Units aren't fixed columns (Display Case/Cooler/Freezer) any more — one
+  // column per unit that actually appears somewhere in these records,
+  // ordered by first appearance.
+  final units = <String, String>{}; // locationId -> locationName
+  for (final r in records) {
+    for (final reading in r.readings) {
+      units.putIfAbsent(reading.locationId, () => reading.locationName);
+    }
+  }
+
+  return LogExportLayout(
+    title: LogType.sushiBarTemp.label,
+    infoLines: _infoLines(LogType.sushiBarTemp, records),
+    headers: [
+      'Date',
+      'Time',
+      for (final name in units.values) name,
+      'Calibration',
+      'Initial',
+    ],
+    rows: [
+      for (final r in records)
+        [
+          r.dateLabel,
+          r.timeSlot.label,
+          for (final id in units.keys) SushiBarTempRecord.tempLabel(r.readingFor(id)?.tempF),
+          _yesNo(r.calibrated),
+          r.initials,
+        ],
     ],
   );
 }
@@ -158,6 +179,8 @@ LogExportLayout _riceHotHoldLayout(List<RiceHotHoldRecord> records) {
       'Start',
       'Actual Temp °F',
       for (final h in riceHotHoldOffsets) ...['+$h hr Time', '+$h hr Temp', '+$h hr Initial'],
+      'Finished Time',
+      'Discard Time',
       'Corrective Action',
       'Initial',
     ],
@@ -173,6 +196,8 @@ LogExportLayout _riceHotHoldLayout(List<RiceHotHoldRecord> records) {
             RiceHotHoldRecord.tempLabel(r.checkAt(h).tempF),
             r.checkAt(h).initials,
           ],
+          r.finishedTime.labelOrDash,
+          r.discardTime.labelOrDash,
           r.correctiveActionLabel,
           r.initials,
         ],

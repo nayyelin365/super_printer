@@ -7,6 +7,14 @@ import '../domain/log_location.dart';
 import '../domain/log_record.dart';
 import '../domain/log_type.dart';
 
+// Note: `logLocationRepositoryProvider`/`logLocationsProvider` are shared
+// by the Receiving Log's "Storage Location" dropdown
+// (`add_receiving_item_screen.dart`) and the Sushi Bar Temp Log's dynamic
+// per-unit readings (`sushi_bar_temp_form_screen.dart`) — the *store*
+// header on all four kitchen logs is still the fixed [logStoreName] /
+// [logStoreLocation] constants (see `log_record.dart`); this list is a
+// different concept ("which units/locations get a reading today").
+
 final logRecordRepositoryProvider = Provider<LogRecordRepository>(
   (ref) => LogRecordRepository(),
 );
@@ -23,10 +31,9 @@ final logRecordsProvider = StreamProvider.family<List<LogRecord>, LogType>((ref,
   return ref.watch(logRecordRepositoryProvider).watchRecords(logType);
 });
 
-/// Live "Unit Name / Location" list (also used for the STORE NAME / STORE
-/// LOCATION header block), shared by every log. Seeds the Firestore
-/// collection with [defaultLogLocationNames] the first time this provider is
-/// created against an empty collection.
+/// Live "Storage Location" list used by the Receiving Log. Seeds the
+/// Firestore collection with [defaultLogLocationNames] the first time this
+/// provider is created against an empty collection.
 final logLocationsProvider = StreamProvider<List<LogLocation>>((ref) async* {
   final repository = ref.watch(logLocationRepositoryProvider);
   await repository.ensureSeeded();
@@ -38,9 +45,9 @@ final logLocationsProvider = StreamProvider<List<LogLocation>>((ref) async* {
 /// form screens read it back as their own concrete type.
 final editingLogRecordProvider = StateProvider<LogRecord?>((ref) => null);
 
-/// Create/update/delete for log records, plus the small bits of app state
-/// (last-used initials, adding a location) the forms need — kept out of the
-/// UI layer per UI -> Controller -> Repository -> Firestore.
+/// Create/update/delete for log records, plus the small bit of app state
+/// (last-used initials) the forms need — kept out of the UI layer per
+/// UI -> Controller -> Repository -> Firestore.
 class LogRecordController {
   LogRecordController(this._ref);
 
@@ -61,6 +68,9 @@ class LogRecordController {
 
   Future<String?> lastUsedInitials() => _ref.read(logPreferencesProvider).loadLastInitials();
 
+  /// Adds a new unit/location to the shared list (e.g. a Sushi Bar Temp
+  /// unit the form doesn't have yet) — everyone reading [logLocationsProvider]
+  /// picks it up immediately.
   Future<LogLocation> addLocation(String name) =>
       _ref.read(logLocationRepositoryProvider).addLocation(name);
 }

@@ -50,18 +50,19 @@ class RiceHotHoldCheck {
 }
 
 /// One row of the "Rice Hot Holding Log" — a batch held hot, its start
-/// temp, and the +2 / +4 / +6 / +8 hour checks.
+/// temp, the +2 / +4 / +6 / +8 hour checks, and when it finished/was
+/// discarded.
 class RiceHotHoldRecord implements LogRecord {
   RiceHotHoldRecord({
     required this.id,
     required this.date,
-    required this.locationId,
-    required this.locationName,
     this.foodItemName = '',
     this.batchNo = '',
     this.start,
     this.actualTempF,
     List<RiceHotHoldCheck>? checks,
+    this.finishedTime,
+    this.discardTime,
     this.correctiveAction = '',
     this.initials = '',
     this.createdAt,
@@ -75,10 +76,6 @@ class RiceHotHoldRecord implements LogRecord {
   final String id;
   @override
   final DateTime date;
-  @override
-  final String locationId;
-  @override
-  final String locationName;
 
   final String foodItemName;
   final String batchNo;
@@ -89,6 +86,14 @@ class RiceHotHoldRecord implements LogRecord {
 
   /// Always length 4, ordered by [riceHotHoldOffsets].
   final List<RiceHotHoldCheck> checks;
+
+  /// When hot holding for this batch ended.
+  final DayTime? finishedTime;
+
+  /// When the batch was actually discarded (may be later than
+  /// [finishedTime] if it sat before being thrown out).
+  final DayTime? discardTime;
+
   final String correctiveAction;
 
   @override
@@ -113,26 +118,26 @@ class RiceHotHoldRecord implements LogRecord {
 
   RiceHotHoldRecord copyWith({
     DateTime? date,
-    String? locationId,
-    String? locationName,
     String? foodItemName,
     String? batchNo,
     DateTime? Function()? start,
     double? Function()? actualTempF,
     List<RiceHotHoldCheck>? checks,
+    DayTime? Function()? finishedTime,
+    DayTime? Function()? discardTime,
     String? correctiveAction,
     String? initials,
   }) {
     return RiceHotHoldRecord(
       id: id,
       date: date ?? this.date,
-      locationId: locationId ?? this.locationId,
-      locationName: locationName ?? this.locationName,
       foodItemName: foodItemName ?? this.foodItemName,
       batchNo: batchNo ?? this.batchNo,
       start: start != null ? start() : this.start,
       actualTempF: actualTempF != null ? actualTempF() : this.actualTempF,
       checks: checks ?? this.checks,
+      finishedTime: finishedTime != null ? finishedTime() : this.finishedTime,
+      discardTime: discardTime != null ? discardTime() : this.discardTime,
       correctiveAction: correctiveAction ?? this.correctiveAction,
       initials: initials ?? this.initials,
       createdAt: createdAt,
@@ -155,13 +160,13 @@ class RiceHotHoldRecord implements LogRecord {
     return RiceHotHoldRecord(
       id: id,
       date: logRecordDateFromMap(data),
-      locationId: data['locationId'] as String? ?? '',
-      locationName: data['locationName'] as String? ?? '',
       foodItemName: data['foodItemName'] as String? ?? '',
       batchNo: data['batchNo'] as String? ?? '',
       start: logRecordDateTimeFromMap(data, 'startMillis'),
       actualTempF: (data['actualTempF'] as num?)?.toDouble(),
       checks: checks,
+      finishedTime: DayTime.fromMinutesOrNull(data['finishedTimeMin'] as int?),
+      discardTime: DayTime.fromMinutesOrNull(data['discardTimeMin'] as int?),
       correctiveAction: data['correctiveAction'] as String? ?? '',
       initials: data['initials'] as String? ?? '',
       createdAt: logRecordTimestampFromMap(data, 'createdAtMillis'),
@@ -174,13 +179,13 @@ class RiceHotHoldRecord implements LogRecord {
     return {
       'logType': logType.id,
       'dateMillis': DateTime(date.year, date.month, date.day).millisecondsSinceEpoch,
-      'locationId': locationId,
-      'locationName': locationName,
       'foodItemName': foodItemName,
       'batchNo': batchNo,
       if (start != null) 'startMillis': start!.millisecondsSinceEpoch,
       if (actualTempF != null) 'actualTempF': actualTempF,
       'checks': [for (final c in checks) c.toMap()],
+      if (finishedTime != null) 'finishedTimeMin': finishedTime!.minutesSinceMidnight,
+      if (discardTime != null) 'discardTimeMin': discardTime!.minutesSinceMidnight,
       'correctiveAction': correctiveAction,
       'initials': initials,
     };

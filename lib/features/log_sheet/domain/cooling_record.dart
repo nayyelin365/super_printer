@@ -8,8 +8,6 @@ class CoolingRecord implements LogRecord {
   const CoolingRecord({
     required this.id,
     required this.date,
-    required this.locationId,
-    required this.locationName,
     this.foodItemName = '',
     this.batchNo = '',
     this.coolingStart,
@@ -30,10 +28,6 @@ class CoolingRecord implements LogRecord {
   /// The cooling day — kept in sync with [coolingStart] when that is set.
   @override
   final DateTime date;
-  @override
-  final String locationId;
-  @override
-  final String locationName;
 
   final String foodItemName;
   final String batchNo;
@@ -67,8 +61,6 @@ class CoolingRecord implements LogRecord {
 
   CoolingRecord copyWith({
     DateTime? date,
-    String? locationId,
-    String? locationName,
     String? foodItemName,
     String? batchNo,
     DateTime? Function()? coolingStart,
@@ -83,8 +75,6 @@ class CoolingRecord implements LogRecord {
     return CoolingRecord(
       id: id,
       date: date ?? this.date,
-      locationId: locationId ?? this.locationId,
-      locationName: locationName ?? this.locationName,
       foodItemName: foodItemName ?? this.foodItemName,
       batchNo: batchNo ?? this.batchNo,
       coolingStart: coolingStart != null ? coolingStart() : this.coolingStart,
@@ -104,8 +94,6 @@ class CoolingRecord implements LogRecord {
     return CoolingRecord(
       id: id,
       date: logRecordDateFromMap(data),
-      locationId: data['locationId'] as String? ?? '',
-      locationName: data['locationName'] as String? ?? '',
       foodItemName: data['foodItemName'] as String? ?? '',
       batchNo: data['batchNo'] as String? ?? '',
       coolingStart: logRecordDateTimeFromMap(data, 'coolingStartMillis'),
@@ -126,8 +114,6 @@ class CoolingRecord implements LogRecord {
     return {
       'logType': logType.id,
       'dateMillis': DateTime(date.year, date.month, date.day).millisecondsSinceEpoch,
-      'locationId': locationId,
-      'locationName': locationName,
       'foodItemName': foodItemName,
       'batchNo': batchNo,
       if (coolingStart != null) 'coolingStartMillis': coolingStart!.millisecondsSinceEpoch,

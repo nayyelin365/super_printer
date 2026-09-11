@@ -3,12 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/theme/app_theme.dart';
+import '../domain/log_location.dart';
 import '../domain/sushi_bar_temp_record.dart';
 import 'log_record_controller.dart';
 import 'widgets/log_form_fields.dart';
 
 /// Routed at `/logs/sushiBarTemp/entry` — create/edit one Sushi Bar Temp
 /// Log reading (`editingLogRecordProvider` null = new).
+///
+/// The temperature fields are not fixed (Display Case / Cooler / Freezer)
+/// — one number field is rendered per unit in the shared
+/// `logLocationsProvider` list, so a kitchen with 5 tracked units types 5
+/// temperatures and one with 2 types 2. "+ Add Unit Location" adds a new
+/// unit to that shared list (via [LogRecordController.addLocation]); it
+/// then shows up here, and everywhere else that reads the same list,
+/// immediately.
 class SushiBarTempFormScreen extends ConsumerStatefulWidget {
   const SushiBarTempFormScreen({super.key});
 
@@ -21,13 +30,15 @@ class _SushiBarTempFormScreenState extends ConsumerState<SushiBarTempFormScreen>
   int _formGeneration = 0;
 
   late DateTime _date;
-  String? _locationId;
-  String _locationName = '';
   TempTimeSlot _timeSlot = TempTimeSlot.nineAm;
-  String _displayCase = '';
-  String _cooler = '';
-  String _freezer = '';
-  bool _calibrated = false;
+
+  /// Typed temperature text, keyed by unit/location id — populated from
+  /// the editing record's readings up front, then filled in as the user
+  /// types into each unit's field (rendered from `logLocationsProvider`,
+  /// not from this map, so a brand-new unit shows up with an empty field).
+  final Map<String, String> _tempByLocationId = {};
+
+  bool? _calibrated;
   String _initials = '';
   bool _isSaving = false;
 
@@ -39,13 +50,13 @@ class _SushiBarTempFormScreenState extends ConsumerState<SushiBarTempFormScreen>
     final e = _editing;
     final now = DateTime.now();
     _date = e?.date ?? DateTime(now.year, now.month, now.day);
-    _locationId = e?.locationId;
-    _locationName = e?.locationName ?? '';
     _timeSlot = e?.timeSlot ?? TempTimeSlot.nineAm;
-    _displayCase = e?.displayCaseTempF?.toString() ?? '';
-    _cooler = e?.coolerTempF?.toString() ?? '';
-    _freezer = e?.freezerTempF?.toString() ?? '';
-    _calibrated = e?.calibrated ?? false;
+    for (final reading in e?.readings ?? const []) {
+      if (reading.tempF != null) {
+        _tempByLocationId[reading.locationId] = reading.tempF!.toString();
+      }
+    }
+    _calibrated = e?.calibrated;
     _initials = e?.initials ?? '';
     if (e == null) {
       ref.read(logRecordControllerProvider).lastUsedInitials().then((last) {
@@ -66,20 +77,64 @@ class _SushiBarTempFormScreenState extends ConsumerState<SushiBarTempFormScreen>
 
   double? _num(String s) => double.tryParse(s.trim());
 
+  Future<void> _addUnitLocation() async {
+    final formKey = GlobalKey<FormState>();
+    var name = '';
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add Unit Location'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(hintText: 'e.g. Sushi Case 2'),
+            onChanged: (value) => name = value,
+            validator: (value) =>
+                (value == null || value.trim().isEmpty) ? 'Enter a unit name' : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.of(dialogContext).pop(name.trim());
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (result == null || result.isEmpty) return;
+    await ref.read(logRecordControllerProvider).addLocation(result);
+    // The new unit shows up on its own once `logLocationsProvider` re-emits
+    // — nothing else to do here.
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
 
+    final locations = ref.read(logLocationsProvider).valueOrNull ?? const <LogLocation>[];
     final editing = _editing;
     final record = SushiBarTempRecord(
       id: editing?.id ?? '',
       date: _date,
-      locationId: _locationId!,
-      locationName: _locationName,
       timeSlot: _timeSlot,
-      displayCaseTempF: _num(_displayCase),
-      coolerTempF: _num(_cooler),
-      freezerTempF: _num(_freezer),
+      readings: [
+        for (final location in locations)
+          UnitTempReading(
+            locationId: location.id,
+            locationName: location.name,
+            tempF: _num(_tempByLocationId[location.id] ?? ''),
+          ),
+      ],
       calibrated: _calibrated,
       initials: _initials.trim(),
       createdAt: editing?.createdAt,
@@ -100,9 +155,7 @@ class _SushiBarTempFormScreenState extends ConsumerState<SushiBarTempFormScreen>
     } else {
       setState(() {
         _formGeneration++;
-        _displayCase = '';
-        _cooler = '';
-        _freezer = '';
+        _tempByLocationId.clear();
       });
     }
   }
@@ -110,6 +163,7 @@ class _SushiBarTempFormScreenState extends ConsumerState<SushiBarTempFormScreen>
   @override
   Widget build(BuildContext context) {
     final isEditing = _editing != null;
+    final locationsAsync = ref.watch(logLocationsProvider);
     return Scaffold(
       backgroundColor: AppTheme.surface,
       body: SafeArea(
@@ -148,30 +202,33 @@ class _SushiBarTempFormScreenState extends ConsumerState<SushiBarTempFormScreen>
                             onChanged: (v) => setState(() => _timeSlot = v ?? _timeSlot),
                           ),
                           const SizedBox(height: 12),
-                          LogLocationField(
-                            locationId: _locationId,
-                            onChanged: (id, name) => setState(() {
-                              _locationId = id;
-                              _locationName = name;
-                            }),
-                          ),
-                          LogNumberField(
-                            label: 'Display Case',
-                            initialValue: _displayCase,
-                            formKeySuffix: '$_formGeneration',
-                            onChanged: (v) => _displayCase = v,
-                          ),
-                          LogNumberField(
-                            label: 'Cooler',
-                            initialValue: _cooler,
-                            formKeySuffix: '$_formGeneration',
-                            onChanged: (v) => _cooler = v,
-                          ),
-                          LogNumberField(
-                            label: 'Freezer',
-                            initialValue: _freezer,
-                            formKeySuffix: '$_formGeneration',
-                            onChanged: (v) => _freezer = v,
+                          locationsAsync.when(
+                            data: (locations) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (final location in locations)
+                                  LogNumberField(
+                                    label: location.name,
+                                    initialValue: _tempByLocationId[location.id] ?? '',
+                                    formKeySuffix: '${location.id}-$_formGeneration',
+                                    onChanged: (v) => _tempByLocationId[location.id] = v,
+                                  ),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: _addUnitLocation,
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text('Add Unit Location'),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                            ),
+                            loading: () => const LinearProgressIndicator(),
+                            error: (error, _) => const Text(
+                              'Could not load unit locations.',
+                              style: TextStyle(color: AppTheme.danger, fontSize: 12),
+                            ),
                           ),
                           LogYesNoField(
                             label: 'Thermometer Calibrated',

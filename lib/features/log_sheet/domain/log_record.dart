@@ -1,5 +1,12 @@
 import 'log_type.dart';
 
+/// Fixed header printed on every one of the four log exports — there's
+/// only one kitchen today, so this is a constant rather than a per-entry
+/// field the user has to pick (that's what the "Store / Unit Location"
+/// field on each form used to be, before it was removed as unnecessary).
+const logStoreName = 'Flavorhub';
+const logStoreLocation = "Bassett's Market - Port Clinton, Ohio";
+
 /// A time of day (no date) stored as minutes since midnight — the shape the
 /// four log records use for their many optional "time" fields (e.g. "Time
 /// Acidified", "Stage 1 Time"). Kept small and immutable; formatting lives
@@ -51,9 +58,6 @@ abstract interface class LogRecord {
   /// Sort key within a day, ascending — minutes since midnight of the
   /// record's primary time (start/first reading), or 0 if it has none.
   int get timeSortKey;
-
-  String get locationId;
-  String get locationName;
 
   /// Who recorded it (initials or name).
   String get initials;

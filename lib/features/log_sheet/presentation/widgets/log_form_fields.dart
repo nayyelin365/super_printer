@@ -85,7 +85,10 @@ class LogYesNoField extends StatelessWidget {
   });
 
   final String label;
-  final bool value;
+
+  /// Null means "not answered yet" — neither pill is shown selected, and
+  /// stays that way until the user actually taps one (no default answer).
+  final bool? value;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -132,104 +135,6 @@ class LogYesNoField extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// Location dropdown backed by [logLocationsProvider], with an inline
-/// "Add New Location" dialog — the same UX as the old entry form. Calls
-/// [onChanged] with the picked location's id + name.
-class LogLocationField extends ConsumerWidget {
-  const LogLocationField({
-    super.key,
-    required this.locationId,
-    required this.onChanged,
-  });
-
-  final String? locationId;
-  final void Function(String id, String name) onChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final locationsAsync = ref.watch(logLocationsProvider);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const LogFieldLabel('Store / Unit Location'),
-        locationsAsync.when(
-          data: (locations) => DropdownButtonFormField<String>(
-            initialValue: locations.any((l) => l.id == locationId) ? locationId : null,
-            isExpanded: true,
-            decoration: const InputDecoration(hintText: 'Select a location'),
-            items: [
-              for (final location in locations)
-                DropdownMenuItem(
-                  value: location.id,
-                  child: Text(location.name, overflow: TextOverflow.ellipsis),
-                ),
-            ],
-            onChanged: (id) {
-              if (id == null) return;
-              final location = locations.firstWhere((l) => l.id == id);
-              onChanged(location.id, location.name);
-            },
-            validator: (value) => value == null ? 'Select a location' : null,
-          ),
-          loading: () => const LinearProgressIndicator(),
-          error: (error, _) => const Text(
-            'Could not load locations.',
-            style: TextStyle(color: AppTheme.danger, fontSize: 12),
-          ),
-        ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => _addLocation(context, ref),
-            icon: const Icon(Icons.add, size: 16),
-            label: const Text('Add New Location'),
-          ),
-        ),
-        const SizedBox(height: 8),
-      ],
-    );
-  }
-
-  Future<void> _addLocation(BuildContext context, WidgetRef ref) async {
-    final formKey = GlobalKey<FormState>();
-    var name = '';
-    final result = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Add New Location'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(hintText: 'Location Name'),
-            onChanged: (value) => name = value,
-            validator: (value) =>
-                (value == null || value.trim().isEmpty) ? 'Enter a location name' : null,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.of(dialogContext).pop(name.trim());
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    if (result == null || result.isEmpty) return;
-    final location = await ref.read(logRecordControllerProvider).addLocation(result);
-    onChanged(location.id, location.name);
   }
 }
 
@@ -393,12 +298,15 @@ Future<DateTime?> pickLogDateTime(BuildContext context, DateTime initial) async 
   return DateTime(date.year, date.month, date.day, time.hour, time.minute);
 }
 
-/// Time-of-day picker returning a [DayTime].
+/// Time-of-day picker returning a [DayTime] — opens on [current] if the
+/// field already has a value, otherwise on the actual current time (never
+/// a fixed hour like 9:00) so a not-yet-set field starts from "now", the
+/// most likely answer for something being logged as it happens.
 Future<DayTime?> pickLogTime(BuildContext context, DayTime? current) async {
-  final now = current ?? const DayTime(9, 0);
+  final start = current ?? DayTime(TimeOfDay.now().hour, TimeOfDay.now().minute);
   final time = await showTimePicker(
     context: context,
-    initialTime: TimeOfDay(hour: now.hour, minute: now.minute),
+    initialTime: TimeOfDay(hour: start.hour, minute: start.minute),
   );
   return time == null ? null : DayTime(time.hour, time.minute);
 }

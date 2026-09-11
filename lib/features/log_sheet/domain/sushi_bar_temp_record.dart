@@ -14,20 +14,59 @@ enum TempTimeSlot {
   final int hour24;
 }
 
+/// One unit's temperature within a [SushiBarTempRecord] — "unit" is
+/// whatever the kitchen tracks (Display Case, Cooler, Freezer, or any
+/// other one added later), backed by the shared `log_locations`
+/// collection (`LogLocationRepository`/`logLocationsProvider`) rather than
+/// a fixed set of columns, so a kitchen with 5 units types 5 temperatures
+/// and one with 2 types 2 — the form always mirrors whatever units exist
+/// today, including ones added on the spot.
+class UnitTempReading {
+  const UnitTempReading({
+    required this.locationId,
+    required this.locationName,
+    this.tempF,
+  });
+
+  final String locationId;
+  final String locationName;
+  final double? tempF;
+
+  static String tempLabel(double? f) => f == null ? '-' : '${f.toStringAsFixed(0)}°F';
+
+  UnitTempReading copyWith({double? Function()? tempF}) {
+    return UnitTempReading(
+      locationId: locationId,
+      locationName: locationName,
+      tempF: tempF != null ? tempF() : this.tempF,
+    );
+  }
+
+  factory UnitTempReading.fromMap(Map<String, dynamic> data) {
+    return UnitTempReading(
+      locationId: data['locationId'] as String? ?? '',
+      locationName: data['locationName'] as String? ?? '',
+      tempF: (data['tempF'] as num?)?.toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'locationId': locationId,
+        'locationName': locationName,
+        if (tempF != null) 'tempF': tempF,
+      };
+}
+
 /// One reading on the "Sushi Bar Temp Log" — a single date + time slot,
-/// with the Display Case / Cooler / Freezer temperatures, whether the
-/// thermometer was calibrated, and the recorder's initial.
+/// a temperature per unit ([readings]), whether the thermometer was
+/// calibrated, and the recorder's initial.
 class SushiBarTempRecord implements LogRecord {
   const SushiBarTempRecord({
     required this.id,
     required this.date,
-    required this.locationId,
-    required this.locationName,
     required this.timeSlot,
-    this.displayCaseTempF,
-    this.coolerTempF,
-    this.freezerTempF,
-    this.calibrated = false,
+    this.readings = const [],
+    this.calibrated,
     this.initials = '',
     this.createdAt,
     this.updatedAt,
@@ -37,16 +76,16 @@ class SushiBarTempRecord implements LogRecord {
   final String id;
   @override
   final DateTime date;
-  @override
-  final String locationId;
-  @override
-  final String locationName;
 
   final TempTimeSlot timeSlot;
-  final double? displayCaseTempF;
-  final double? coolerTempF;
-  final double? freezerTempF;
-  final bool calibrated;
+
+  /// One entry per unit tracked at the time this record was saved — see
+  /// the class doc on [UnitTempReading].
+  final List<UnitTempReading> readings;
+
+  /// Whether the thermometer was calibrated — null means "not answered
+  /// yet" (no default), not "No".
+  final bool? calibrated;
 
   @override
   final String initials;
@@ -63,29 +102,26 @@ class SushiBarTempRecord implements LogRecord {
 
   String get dateLabel => logRecordDateLabel(date);
 
-  static String tempLabel(double? f) => f == null ? '-' : '${f.toStringAsFixed(0)}°F';
+  static String tempLabel(double? f) => UnitTempReading.tempLabel(f);
+
+  /// Reading for [locationId], or null if this record has none (a unit
+  /// added after this record was saved, for instance).
+  UnitTempReading? readingFor(String locationId) =>
+      readings.where((r) => r.locationId == locationId).firstOrNull;
 
   SushiBarTempRecord copyWith({
     DateTime? date,
-    String? locationId,
-    String? locationName,
     TempTimeSlot? timeSlot,
-    double? Function()? displayCaseTempF,
-    double? Function()? coolerTempF,
-    double? Function()? freezerTempF,
-    bool? calibrated,
+    List<UnitTempReading>? readings,
+    bool? Function()? calibrated,
     String? initials,
   }) {
     return SushiBarTempRecord(
       id: id,
       date: date ?? this.date,
-      locationId: locationId ?? this.locationId,
-      locationName: locationName ?? this.locationName,
       timeSlot: timeSlot ?? this.timeSlot,
-      displayCaseTempF: displayCaseTempF != null ? displayCaseTempF() : this.displayCaseTempF,
-      coolerTempF: coolerTempF != null ? coolerTempF() : this.coolerTempF,
-      freezerTempF: freezerTempF != null ? freezerTempF() : this.freezerTempF,
-      calibrated: calibrated ?? this.calibrated,
+      readings: readings ?? this.readings,
+      calibrated: calibrated != null ? calibrated() : this.calibrated,
       initials: initials ?? this.initials,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -93,16 +129,15 @@ class SushiBarTempRecord implements LogRecord {
   }
 
   factory SushiBarTempRecord.fromMap(String id, Map<String, dynamic> data) {
+    final rawReadings = data['readings'] as List<dynamic>? ?? const [];
     return SushiBarTempRecord(
       id: id,
       date: logRecordDateFromMap(data),
-      locationId: data['locationId'] as String? ?? '',
-      locationName: data['locationName'] as String? ?? '',
       timeSlot: TempTimeSlot.values.byName(data['timeSlot'] as String? ?? 'nineAm'),
-      displayCaseTempF: (data['displayCaseTempF'] as num?)?.toDouble(),
-      coolerTempF: (data['coolerTempF'] as num?)?.toDouble(),
-      freezerTempF: (data['freezerTempF'] as num?)?.toDouble(),
-      calibrated: data['calibrated'] as bool? ?? false,
+      readings: [
+        for (final r in rawReadings) UnitTempReading.fromMap(Map<String, dynamic>.from(r as Map)),
+      ],
+      calibrated: data['calibrated'] as bool?,
       initials: data['initials'] as String? ?? '',
       createdAt: logRecordTimestampFromMap(data, 'createdAtMillis'),
       updatedAt: logRecordTimestampFromMap(data, 'updatedAtMillis'),
@@ -114,13 +149,9 @@ class SushiBarTempRecord implements LogRecord {
     return {
       'logType': logType.id,
       'dateMillis': DateTime(date.year, date.month, date.day).millisecondsSinceEpoch,
-      'locationId': locationId,
-      'locationName': locationName,
       'timeSlot': timeSlot.name,
-      if (displayCaseTempF != null) 'displayCaseTempF': displayCaseTempF,
-      if (coolerTempF != null) 'coolerTempF': coolerTempF,
-      if (freezerTempF != null) 'freezerTempF': freezerTempF,
-      'calibrated': calibrated,
+      'readings': [for (final r in readings) r.toMap()],
+      if (calibrated != null) 'calibrated': calibrated,
       'initials': initials,
     };
   }
