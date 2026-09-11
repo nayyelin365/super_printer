@@ -1,9 +1,12 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:super_printer/app.dart';
+import 'package:super_printer/features/food_selection/data/food_catalog_repository.dart';
+import 'package:super_printer/features/food_selection/presentation/food_selection_controller.dart';
 
 void main() {
   Future<void> pumpApp(WidgetTester tester) async {
@@ -13,7 +16,19 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const ProviderScope(child: SuperPrinterApp()));
+    // The food catalog now lives in Firestore — swap in an in-memory fake
+    // so these widget tests (which never call `Firebase.initializeApp`)
+    // don't try to reach a real project.
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          foodCatalogRepositoryProvider.overrideWithValue(
+            FoodCatalogRepository(firestore: FakeFirebaseFirestore()),
+          ),
+        ],
+        child: const SuperPrinterApp(),
+      ),
+    );
     await tester.pumpAndSettle();
   }
 

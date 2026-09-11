@@ -1,31 +1,39 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/food_catalog_storage.dart';
+import '../data/food_catalog_repository.dart';
 import '../domain/food_catalog.dart';
 
-/// The food catalog, backed by [FoodCatalogStorage]. Seeded from
-/// [FoodCatalog.breakfastMenu] on first run, then fully driven by user
-/// add/remove actions (and Food Rotation's Save button) — every mutation
-/// is persisted immediately.
+/// The food catalog, backed by [FoodCatalogRepository] (Firestore, shared
+/// across every device) — seeded from [FoodCatalog.breakfastMenu] on first
+/// run, then fully driven by user add/remove actions (and Food Rotation's
+/// Save button).
+///
+/// Still a plain `List<FoodModel>` [StateNotifier] rather than an
+/// `AsyncValue`-returning stream provider: the controller subscribes to
+/// Firestore itself and mirrors every update into [state], so none of the
+/// screens/controllers that already do `ref.watch(foodCatalogProvider)`
+/// (a synchronous list) needed to change — see the class doc on
+/// [FoodCatalog] for why this swap was designed to be invisible to them.
 class FoodCatalogController extends StateNotifier<List<FoodModel>> {
-  FoodCatalogController(this._storage) : super(FoodCatalog.breakfastMenu) {
-    _restore();
+  FoodCatalogController(this._repository) : super(FoodCatalog.breakfastMenu) {
+    _init();
   }
 
-  final FoodCatalogStorage _storage;
+  final FoodCatalogRepository _repository;
+  StreamSubscription<List<FoodModel>>? _subscription;
 
-  Future<void> _restore() async {
-    final saved = await _storage.load();
-    if (saved != null) {
-      state = saved;
-    }
-    // No saved list yet (first run): keep the in-memory default from the
-    // constructor as-is. Deliberately not eagerly persisting it here —
-    // doing so would race with an add/remove that runs before this
-    // restore completes and could clobber it with the stale defaults.
-    // The defaults are constant, so there's nothing lost by only
-    // persisting on the first real mutation.
+  Future<void> _init() async {
+    await _repository.ensureSeeded();
+    _subscription = _repository.watchAll().listen((items) => state = items);
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   /// Adds [name] if it's non-empty and not already present
@@ -41,18 +49,15 @@ class FoodCatalogController extends StateNotifier<List<FoodModel>> {
         state.any((food) => food.name.toLowerCase() == trimmed.toLowerCase());
     if (alreadyExists) return false;
 
-    state = [
-      ...state,
+    await _repository.setFood(
       FoodModel(name: trimmed, color: color, targetTemperature: targetTemperature),
-    ];
-    await _storage.save(state);
+    );
+    // `state` updates itself once the `watchAll()` listener above observes
+    // this write — no need to set it optimistically here.
     return true;
   }
 
-  Future<void> removeFood(String name) async {
-    state = state.where((food) => food.name != name).toList();
-    await _storage.save(state);
-  }
+  Future<void> removeFood(String name) => _repository.deleteFood(name);
 
   /// Attaches Food Rotation settings (hours until use-by, employee, pH) to
   /// the catalog entry named [name] — picked up next time that food is
@@ -64,27 +69,26 @@ class FoodCatalogController extends StateNotifier<List<FoodModel>> {
     String? employee,
     String? ph,
   }) async {
-    final index = state.indexWhere((food) => food.name == name);
-    if (index == -1) return;
+    final existing = state.where((food) => food.name == name).firstOrNull;
+    if (existing == null) return;
 
-    final updated = [...state];
-    updated[index] = updated[index].copyWith(
-      useByHours: () => useByHours,
-      employee: () => employee,
-      ph: () => ph,
+    await _repository.setFood(
+      existing.copyWith(
+        useByHours: () => useByHours,
+        employee: () => employee,
+        ph: () => ph,
+      ),
     );
-    state = updated;
-    await _storage.save(state);
   }
 }
 
-final foodCatalogStorageProvider = Provider<FoodCatalogStorage>(
-  (ref) => FoodCatalogStorage(),
+final foodCatalogRepositoryProvider = Provider<FoodCatalogRepository>(
+  (ref) => FoodCatalogRepository(),
 );
 
 final foodCatalogProvider =
     StateNotifierProvider<FoodCatalogController, List<FoodModel>>(
-  (ref) => FoodCatalogController(ref.watch(foodCatalogStorageProvider)),
+  (ref) => FoodCatalogController(ref.watch(foodCatalogRepositoryProvider)),
 );
 
 /// The current search box text, trimmed and lower-cased for matching.

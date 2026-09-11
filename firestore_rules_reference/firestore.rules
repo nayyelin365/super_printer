@@ -36,6 +36,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Food catalog (Item Lists) — one doc per food, keyed by its own name.
+    match /food_catalog/{foodName} {
+      allow read, write: if true;
+    }
+
     // Receiving Log feature (items live in a subcollection under each invoice)
     match /receiving_invoices/{invoiceId} {
       allow read, write: if true;

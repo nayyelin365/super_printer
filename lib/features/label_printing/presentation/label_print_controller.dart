@@ -394,7 +394,7 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
   void startNewLabel(LabelTemplate template, {String? foodName, FoodModel? food}) {
     state = LabelPrintState(
       labelData: _freshData(template, foodName: foodName, food: food),
-      useByAmount: food?.useByHours ?? 24,
+      useByAmount: food?.useByHours ?? 48,
       formGeneration: state.formGeneration + 1,
     );
   }

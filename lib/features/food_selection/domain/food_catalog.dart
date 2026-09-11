@@ -70,20 +70,17 @@ class FoodModel {
   }
 }
 
-/// Local, in-memory food catalog.
+/// The default food catalog, seeded into Firestore once (see
+/// `FoodCatalogRepository.ensureSeeded`) the first time the shared
+/// `food_catalog` collection is empty.
 ///
-/// This is intentionally the only place that knows where food data comes
-/// from. Screens and controllers only ever depend on [foodCatalogProvider]
-/// (see `food_selection_controller.dart`), so swapping this for an
-/// API/database-backed repository later doesn't touch any UI code.
+/// This is intentionally the only place that knows the catalog's starting
+/// contents. Screens and controllers only ever depend on
+/// [foodCatalogProvider] (see `food_selection_controller.dart`), so where
+/// the live data actually comes from (Firestore, previously on-device
+/// `SharedPreferences`) never touches any UI code.
 class FoodCatalog {
   const FoodCatalog._();
 
-  static const List<FoodModel> breakfastMenu = [
-    FoodModel(name: 'Classic Pancakes'),
-    FoodModel(name: 'French Toast'),
-    FoodModel(name: 'Belgian Waffles'),
-    FoodModel(name: 'Breakfast Burrito'),
-    FoodModel(name: 'Egg & Cheese Sandwich'),
-  ];
+  static const List<FoodModel> breakfastMenu = [];
 }
