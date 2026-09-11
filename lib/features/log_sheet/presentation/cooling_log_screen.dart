@@ -43,7 +43,11 @@ class CoolingLogScreen extends ConsumerWidget {
         logType: LogType.cooling,
         records: records.cast<LogRecord>(),
       ),
-      onExportPdf: (records) => printLogRecordPdf(
+      onExportPdf: (records) => shareLogRecordPdf(
+        logType: LogType.cooling,
+        records: records.cast<LogRecord>(),
+      ),
+      onPrintPdf: (records) => printLogRecordPdf(
         logType: LogType.cooling,
         records: records.cast<LogRecord>(),
       ),

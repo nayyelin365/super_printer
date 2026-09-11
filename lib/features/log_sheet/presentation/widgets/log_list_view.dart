@@ -7,6 +7,8 @@ import '../../domain/log_record.dart';
 import '../../domain/log_type.dart';
 import '../log_record_controller.dart';
 
+enum _ShareFormat { excel, pdf }
+
 /// One spreadsheet column for a log's history table.
 class LogColumn<T extends LogRecord> {
   const LogColumn(this.label, this.value, {this.numeric = false});
@@ -16,11 +18,12 @@ class LogColumn<T extends LogRecord> {
 }
 
 /// Shared history screen for all four logs — a sticky header (back / title /
-/// Add / Export Excel / Export PDF) over a horizontally-scrollable
-/// `DataTable`, one row per saved record (newest first, already sorted by
-/// the repository). Tap a row to edit; trailing icon deletes with a
-/// confirm. "Excel format" for printing is the export, not the on-screen
-/// layout (which stays plain rows).
+/// Share / Print / Add) over a horizontally-scrollable `DataTable`, one row
+/// per saved record (newest first, already sorted by the repository). Tap
+/// a row to edit; trailing icon deletes with a confirm. "Excel format" for
+/// printing is the export, not the on-screen layout (which stays plain
+/// rows). Share opens a small dialog to pick Excel or PDF; Print is its
+/// own separate action (the system print / save-as-PDF dialog).
 class LogListView<T extends LogRecord> extends ConsumerWidget {
   const LogListView({
     super.key,
@@ -30,6 +33,7 @@ class LogListView<T extends LogRecord> extends ConsumerWidget {
     required this.onEdit,
     required this.onExportExcel,
     required this.onExportPdf,
+    required this.onPrintPdf,
   });
 
   final LogType logType;
@@ -37,7 +41,12 @@ class LogListView<T extends LogRecord> extends ConsumerWidget {
   final VoidCallback onAdd;
   final void Function(T record) onEdit;
   final void Function(List<T> records) onExportExcel;
+
+  /// Shares the PDF via the system share sheet.
   final void Function(List<T> records) onExportPdf;
+
+  /// Opens the system print / save-as-PDF dialog instead of sharing.
+  final void Function(List<T> records) onPrintPdf;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -70,17 +79,17 @@ class LogListView<T extends LogRecord> extends ConsumerWidget {
                   ),
                   IconButton(
                     onPressed: () => recordsAsync.whenData(
-                      (records) => onExportExcel(records.cast<T>()),
+                      (records) => _shareRecords(context, records.cast<T>()),
                     ),
-                    icon: const Icon(Icons.grid_on_outlined),
-                    tooltip: 'Export Excel',
+                    icon: const Icon(Icons.share_outlined),
+                    tooltip: 'Share',
                   ),
                   IconButton(
                     onPressed: () => recordsAsync.whenData(
-                      (records) => onExportPdf(records.cast<T>()),
+                      (records) => onPrintPdf(records.cast<T>()),
                     ),
                     icon: const Icon(Icons.print_outlined),
-                    tooltip: 'Export / Print PDF',
+                    tooltip: 'Print',
                   ),
                   const SizedBox(width: 4),
                   ElevatedButton.icon(
@@ -129,6 +138,49 @@ class LogListView<T extends LogRecord> extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Asks Excel or PDF, then hands [records] to the matching share
+  /// callback — one Share entry point instead of two toolbar buttons.
+  /// Print (the system print/save-as-PDF dialog) is a separate action.
+  Future<void> _shareRecords(BuildContext context, List<T> records) async {
+    final choice = await showDialog<_ShareFormat>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Share as'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop(_ShareFormat.excel),
+            child: const Row(
+              children: [
+                Icon(Icons.grid_on_outlined, size: 20),
+                SizedBox(width: 12),
+                Text('Share Excel'),
+              ],
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop(_ShareFormat.pdf),
+            child: const Row(
+              children: [
+                Icon(Icons.picture_as_pdf_outlined, size: 20),
+                SizedBox(width: 12),
+                Text('Share PDF'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    switch (choice) {
+      case _ShareFormat.excel:
+        onExportExcel(records);
+      case _ShareFormat.pdf:
+        onExportPdf(records);
+      case null:
+        break;
+    }
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref, T record) async {

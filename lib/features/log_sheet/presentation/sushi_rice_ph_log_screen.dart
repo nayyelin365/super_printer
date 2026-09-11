@@ -47,7 +47,11 @@ class SushiRicePhLogScreen extends ConsumerWidget {
         logType: LogType.sushiRicePh,
         records: records.cast<LogRecord>(),
       ),
-      onExportPdf: (records) => printLogRecordPdf(
+      onExportPdf: (records) => shareLogRecordPdf(
+        logType: LogType.sushiRicePh,
+        records: records.cast<LogRecord>(),
+      ),
+      onPrintPdf: (records) => printLogRecordPdf(
         logType: LogType.sushiRicePh,
         records: records.cast<LogRecord>(),
       ),

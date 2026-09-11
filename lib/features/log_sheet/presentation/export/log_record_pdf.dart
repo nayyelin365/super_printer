@@ -1,22 +1,17 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../domain/log_record.dart';
 import '../../domain/log_type.dart';
 import 'log_record_layout.dart';
 
-/// Opens the system print / save-as-PDF dialog for one log — a landscape,
-/// multi-page table matching the Excel export and the paper form. Same
-/// `pw.Document` + `Printing.layoutPdf` pattern as the old
-/// `printLogSheetPdf`.
-Future<void> printLogRecordPdf({
-  required LogType logType,
-  required List<LogRecord> records,
-}) async {
-  final layout = buildLogExportLayout(logType, records);
+/// Builds the landscape, multi-page PDF table for one log's records —
+/// matching the Excel export and the paper form. Shared by
+/// [shareLogRecordPdf] and [printLogRecordPdf] so both render identically.
+pw.Document _buildPdfDocument(LogExportLayout layout) {
   final doc = pw.Document();
-
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4.landscape,
@@ -48,6 +43,40 @@ Future<void> printLogRecordPdf({
       ],
     ),
   );
+  return doc;
+}
+
+/// Builds a PDF of one log's records and opens the system share sheet —
+/// same in-memory pattern as `shareLogRecordExcel` ([XFile.fromData], no
+/// print/save-as dialog).
+Future<void> shareLogRecordPdf({
+  required LogType logType,
+  required List<LogRecord> records,
+}) async {
+  final layout = buildLogExportLayout(logType, records);
+  final bytes = await _buildPdfDocument(layout).save();
+  final fileName = '${layout.fileStem}.pdf';
+
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [
+        XFile.fromData(bytes, name: fileName, mimeType: 'application/pdf'),
+      ],
+      fileNameOverrides: [fileName],
+      subject: '${logType.label} export',
+    ),
+  );
+}
+
+/// Opens the system print / save-as-PDF dialog for one log, instead of the
+/// share sheet — for actually printing the page rather than sending it
+/// somewhere.
+Future<void> printLogRecordPdf({
+  required LogType logType,
+  required List<LogRecord> records,
+}) async {
+  final layout = buildLogExportLayout(logType, records);
+  final doc = _buildPdfDocument(layout);
 
   await Printing.layoutPdf(
     onLayout: (format) => doc.save(),
