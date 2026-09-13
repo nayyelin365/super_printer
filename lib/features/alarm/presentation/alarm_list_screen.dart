@@ -7,7 +7,9 @@ import '../domain/alarm.dart';
 import 'alarm_controller.dart';
 import 'widgets/alarm_card.dart';
 
-/// Routed at `/alarms` - lists every alarm, similar to a phone Clock app.
+/// The "Alarms" tab content, embedded in [AlarmHomeScreen] (routed at
+/// `/alarms`) alongside the "Timers" tab — lists every alarm, similar to a
+/// phone Clock app.
 class AlarmListScreen extends ConsumerWidget {
   const AlarmListScreen({super.key});
 
@@ -16,9 +18,7 @@ class AlarmListScreen extends ConsumerWidget {
     final alarms = [...ref.watch(alarmControllerProvider)]
       ..sort((a, b) => (a.hour * 60 + a.minute).compareTo(b.hour * 60 + b.minute));
 
-    return Scaffold(
-      backgroundColor: AppTheme.surface,
-      body: SafeArea(
+    return SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -79,8 +79,7 @@ class AlarmListScreen extends ConsumerWidget {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   void _openEditor(BuildContext context, WidgetRef ref, Alarm? alarm) {

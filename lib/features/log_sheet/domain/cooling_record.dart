@@ -14,8 +14,10 @@ class CoolingRecord implements LogRecord {
     this.initialTempF,
     this.stage1Time,
     this.stage1TempF,
+    this.stage1Initials = '',
     this.stage2Time,
     this.stage2TempF,
+    this.stage2Initials = '',
     this.correctiveAction = '',
     this.initials = '',
     this.createdAt,
@@ -37,8 +39,16 @@ class CoolingRecord implements LogRecord {
   final double? initialTempF;
   final DayTime? stage1Time;
   final double? stage1TempF;
+
+  /// Who took the Stage 1 (135°F → 70°F) reading.
+  final String stage1Initials;
+
   final DayTime? stage2Time;
   final double? stage2TempF;
+
+  /// Who took the Stage 2 (→ 41°F) reading.
+  final String stage2Initials;
+
   final String correctiveAction;
 
   @override
@@ -67,8 +77,10 @@ class CoolingRecord implements LogRecord {
     double? Function()? initialTempF,
     DayTime? Function()? stage1Time,
     double? Function()? stage1TempF,
+    String? stage1Initials,
     DayTime? Function()? stage2Time,
     double? Function()? stage2TempF,
+    String? stage2Initials,
     String? correctiveAction,
     String? initials,
   }) {
@@ -81,8 +93,10 @@ class CoolingRecord implements LogRecord {
       initialTempF: initialTempF != null ? initialTempF() : this.initialTempF,
       stage1Time: stage1Time != null ? stage1Time() : this.stage1Time,
       stage1TempF: stage1TempF != null ? stage1TempF() : this.stage1TempF,
+      stage1Initials: stage1Initials ?? this.stage1Initials,
       stage2Time: stage2Time != null ? stage2Time() : this.stage2Time,
       stage2TempF: stage2TempF != null ? stage2TempF() : this.stage2TempF,
+      stage2Initials: stage2Initials ?? this.stage2Initials,
       correctiveAction: correctiveAction ?? this.correctiveAction,
       initials: initials ?? this.initials,
       createdAt: createdAt,
@@ -100,8 +114,10 @@ class CoolingRecord implements LogRecord {
       initialTempF: (data['initialTempF'] as num?)?.toDouble(),
       stage1Time: DayTime.fromMinutesOrNull(data['stage1TimeMin'] as int?),
       stage1TempF: (data['stage1TempF'] as num?)?.toDouble(),
+      stage1Initials: data['stage1Initials'] as String? ?? '',
       stage2Time: DayTime.fromMinutesOrNull(data['stage2TimeMin'] as int?),
       stage2TempF: (data['stage2TempF'] as num?)?.toDouble(),
+      stage2Initials: data['stage2Initials'] as String? ?? '',
       correctiveAction: data['correctiveAction'] as String? ?? '',
       initials: data['initials'] as String? ?? '',
       createdAt: logRecordTimestampFromMap(data, 'createdAtMillis'),
@@ -120,8 +136,10 @@ class CoolingRecord implements LogRecord {
       if (initialTempF != null) 'initialTempF': initialTempF,
       if (stage1Time != null) 'stage1TimeMin': stage1Time!.minutesSinceMidnight,
       if (stage1TempF != null) 'stage1TempF': stage1TempF,
+      'stage1Initials': stage1Initials,
       if (stage2Time != null) 'stage2TimeMin': stage2Time!.minutesSinceMidnight,
       if (stage2TempF != null) 'stage2TempF': stage2TempF,
+      'stage2Initials': stage2Initials,
       'correctiveAction': correctiveAction,
       'initials': initials,
     };

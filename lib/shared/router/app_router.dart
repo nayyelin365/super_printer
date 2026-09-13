@@ -1,7 +1,7 @@
 import 'package:go_router/go_router.dart';
 
 import '../../features/alarm/presentation/alarm_editor_screen.dart';
-import '../../features/alarm/presentation/alarm_list_screen.dart';
+import '../../features/alarm/presentation/alarm_home_screen.dart';
 import '../../features/food_selection/presentation/food_selection_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/label_printing/presentation/label_print_screen.dart';
@@ -64,7 +64,7 @@ GoRouter createAppRouter() => GoRouter(
           builder: (context, state) => const FoodSelectionScreen(),
         ),
         GoRoute(path: '/print', builder: (context, state) => const LabelPrintScreen()),
-        GoRoute(path: '/alarms', builder: (context, state) => const AlarmListScreen()),
+        GoRoute(path: '/alarms', builder: (context, state) => const AlarmHomeScreen()),
         GoRoute(
           path: '/alarms/editor',
           builder: (context, state) => const AlarmEditorScreen(),

@@ -164,15 +164,19 @@ void main() {
         initialTempF: 170,
         stage1Time: const DayTime(14, 0),
         stage1TempF: 68,
+        stage1Initials: 'NL',
         stage2Time: const DayTime(17, 0),
         stage2TempF: 40,
+        stage2Initials: 'JS',
         correctiveAction: '',
         initials: 'NL',
       );
       final restored = CoolingRecord.fromMap('r3', record.toMap());
       expect(restored.coolingStart, DateTime(2026, 9, 2, 12, 0));
       expect(restored.stage1Time, const DayTime(14, 0));
+      expect(restored.stage1Initials, 'NL');
       expect(restored.stage2TempF, 40);
+      expect(restored.stage2Initials, 'JS');
       expect(restored.correctiveActionLabel, 'None');
     });
   });
@@ -191,21 +195,27 @@ void main() {
       expect(record.checkAt(2).tempF, isNull);
     });
 
-    test('round-trips all four checks', () {
+    test('round-trips all three checks (+2/+4/+6, no +8)', () {
+      expect(riceHotHoldOffsets, [2, 4, 6]);
       final record = RiceHotHoldRecord(
         id: 'r5',
         date: DateTime(2026, 9, 3),
         foodItemName: 'Sushi Rice',
         start: DateTime(2026, 9, 3, 12, 0),
+        startInitials: 'NL',
         actualTempF: 170,
+        actualTempInitials: 'NL',
         checks: [
           for (final h in riceHotHoldOffsets)
             RiceHotHoldCheck(hourOffset: h, tempF: 150 + h.toDouble(), initials: 'NL'),
         ],
       );
       final restored = RiceHotHoldRecord.fromMap('r5', record.toMap());
-      expect(restored.checkAt(8).tempF, 158);
+      expect(restored.checks, hasLength(3));
+      expect(restored.checkAt(6).tempF, 156);
       expect(restored.start, DateTime(2026, 9, 3, 12, 0));
+      expect(restored.startInitials, 'NL');
+      expect(restored.actualTempInitials, 'NL');
     });
 
     test('round-trips finishedTime and discardTime', () {

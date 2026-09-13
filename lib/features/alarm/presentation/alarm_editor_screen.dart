@@ -44,7 +44,7 @@ class _AlarmEditorScreenState extends ConsumerState<AlarmEditorScreen> {
     _enabled = editing?.enabled ?? true;
     _repeatDays = {...(editing?.repeatDays ?? const <int>{})};
     _soundId = editing?.soundId ?? defaultAlarmSoundId;
-    _repeatSound = editing?.repeatSound ?? false;
+    _repeatSound = editing?.repeatSound ?? true;
 
     // A new alarm starts pre-selected with whatever sound was last saved
     // (see `AlarmStorage.loadDefaultSoundId`), not always "Default" — an

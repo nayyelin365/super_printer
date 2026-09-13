@@ -9,7 +9,7 @@ import 'log_record_controller.dart';
 import 'widgets/log_form_fields.dart';
 
 /// Routed at `/logs/riceHotHold/entry` — create/edit one Rice Hot Holding
-/// Log row (start temp + the +2 / +4 / +6 / +8 hour checks).
+/// Log row (start temp + the +2 / +4 / +6 hour checks).
 class RiceHotHoldFormScreen extends ConsumerStatefulWidget {
   const RiceHotHoldFormScreen({super.key});
 
@@ -24,7 +24,9 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
   String _foodItemName = '';
   String _batchNo = '';
   DateTime? _start;
+  String _startInitials = '';
   String _actualTemp = '';
+  String _actualTempInitials = '';
   late Map<int, DayTime?> _checkTimes;
   late Map<int, String> _checkTemps;
   late Map<int, String> _checkInitials;
@@ -43,7 +45,9 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
     _foodItemName = e?.foodItemName ?? '';
     _batchNo = e?.batchNo ?? '';
     _start = e?.start;
+    _startInitials = e?.startInitials ?? '';
     _actualTemp = e?.actualTempF?.toString() ?? '';
+    _actualTempInitials = e?.actualTempInitials ?? '';
     _finishedTime = e?.finishedTime;
     _discardTime = e?.discardTime;
     _correctiveAction = e?.correctiveAction ?? '';
@@ -76,7 +80,9 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
       foodItemName: _foodItemName.trim(),
       batchNo: _batchNo.trim(),
       start: _start,
+      startInitials: _startInitials.trim(),
       actualTempF: _num(_actualTemp),
+      actualTempInitials: _actualTempInitials.trim(),
       checks: [
         for (final h in riceHotHoldOffsets)
           RiceHotHoldCheck(
@@ -111,7 +117,9 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
         _foodItemName = '';
         _batchNo = '';
         _start = null;
+        _startInitials = '';
         _actualTemp = '';
+        _actualTempInitials = '';
         _finishedTime = null;
         _discardTime = null;
         _correctiveAction = '';
@@ -168,6 +176,15 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
                             },
                             onClear: _start == null ? null : () => setState(() => _start = null),
                           ),
+                          const LogFieldLabel('Start Initial'),
+                          TextFormField(
+                            key: ValueKey('start-initials-$_formGeneration'),
+                            initialValue: _startInitials,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(hintText: 'e.g. NL'),
+                            onChanged: (v) => _startInitials = v,
+                          ),
+                          const SizedBox(height: 12),
                           LogNumberField(
                             label: 'Actual Temp °F (at start)',
                             initialValue: _actualTemp,
@@ -175,6 +192,15 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
                             formKeySuffix: '$_formGeneration',
                             onChanged: (v) => _actualTemp = v,
                           ),
+                          const LogFieldLabel('Actual Temp Initial'),
+                          TextFormField(
+                            key: ValueKey('actual-temp-initials-$_formGeneration'),
+                            initialValue: _actualTempInitials,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(hintText: 'e.g. NL'),
+                            onChanged: (v) => _actualTempInitials = v,
+                          ),
+                          const SizedBox(height: 12),
                           for (final h in riceHotHoldOffsets) ...[
                             const Divider(height: 24),
                             Text(

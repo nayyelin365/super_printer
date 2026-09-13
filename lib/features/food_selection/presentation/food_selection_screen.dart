@@ -23,6 +23,27 @@ const _foodCategoryColors = [
   Color(0xFF495057),
 ];
 
+/// Display name for each swatch above, in the same order — used as the
+/// group header when the grid is grouped by category color (e.g. "Green
+/// group", "Red group").
+const _foodCategoryColorNames = [
+  'Red',
+  'Orange',
+  'Yellow',
+  'Green',
+  'Teal',
+  'Blue',
+  'Indigo',
+  'Purple',
+  'Pink',
+  'Gray',
+];
+
+String _colorGroupName(Color color) {
+  final index = _foodCategoryColors.indexOf(color);
+  return index == -1 ? 'Other' : _foodCategoryColorNames[index];
+}
+
 /// Step in the printing flow for templates that need a food/menu item
 /// picked first (see [LabelTemplate.requiresFoodSelection]). Selecting one
 /// starts a fresh label (see [LabelPrintController.startNewLabel]) for the
@@ -109,27 +130,11 @@ class FoodSelectionScreen extends ConsumerWidget {
                         style: TextStyle(color: Colors.black45, fontSize: 14),
                       ),
                     )
-                  : GridView.builder(
-                      padding: const EdgeInsets.all(20),
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 150,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 1.3,
-                          ),
-                      itemCount: foods.length,
-                      itemBuilder: (context, index) {
-                        final food = foods[index];
-                        return FoodCard(
-                          name: food.name,
-                          color: food.color,
-                          targetTemperature: food.targetTemperature,
-                          onSelect: () => _selectFood(context, ref, food),
-                          onRemove: () =>
-                              _confirmRemoveFood(context, ref, food.name),
-                        );
-                      },
+                  : _GroupedFoodGrid(
+                      foods: foods,
+                      onSelect: (food) => _selectFood(context, ref, food),
+                      onRemove: (food) =>
+                          _confirmRemoveFood(context, ref, food.name),
                     ),
             ),
           ],
@@ -177,6 +182,119 @@ class FoodSelectionScreen extends ConsumerWidget {
     if (confirmed == true) {
       await ref.read(foodCatalogProvider.notifier).removeFood(food);
     }
+  }
+}
+
+/// Lays [foods] out as one section per category color (e.g. "Green group",
+/// "Red group") — foods with no category color are grouped last, under
+/// "Uncategorized". Sections follow `_foodCategoryColors`' order, and only
+/// colors actually in use get a section, so removing every food in a color
+/// removes that color's section too rather than leaving it empty.
+class _GroupedFoodGrid extends StatelessWidget {
+  const _GroupedFoodGrid({
+    required this.foods,
+    required this.onSelect,
+    required this.onRemove,
+  });
+
+  final List<FoodModel> foods;
+  final void Function(FoodModel food) onSelect;
+  final void Function(FoodModel food) onRemove;
+
+  static const _gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: 150,
+    mainAxisSpacing: 12,
+    crossAxisSpacing: 12,
+    childAspectRatio: 1.3,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = <(Color?, List<FoodModel>)>[];
+    for (final color in _foodCategoryColors) {
+      final matches = foods.where((f) => f.color == color).toList();
+      if (matches.isNotEmpty) groups.add((color, matches));
+    }
+    // Any color a food was saved with before being removed from the preset
+    // list still gets its own section rather than folding into "no color".
+    final knownColors = _foodCategoryColors.toSet();
+    final customColors = foods
+        .map((f) => f.color)
+        .whereType<Color>()
+        .where((c) => !knownColors.contains(c))
+        .toSet();
+    for (final color in customColors) {
+      groups.add((color, foods.where((f) => f.color == color).toList()));
+    }
+    final uncategorized = foods.where((f) => f.color == null).toList();
+    if (uncategorized.isNotEmpty) groups.add((null, uncategorized));
+
+    return CustomScrollView(
+      slivers: [
+        for (final group in groups) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+            sliver: SliverToBoxAdapter(
+              child: _GroupHeader(color: group.$1, count: group.$2.length),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverGrid(
+              gridDelegate: _gridDelegate,
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final food = group.$2[index];
+                  return FoodCard(
+                    name: food.name,
+                    color: food.color,
+                    targetTemperature: food.targetTemperature,
+                    onSelect: () => onSelect(food),
+                    onRemove: () => onRemove(food),
+                  );
+                },
+                childCount: group.$2.length,
+              ),
+            ),
+          ),
+        ],
+        const SliverPadding(padding: EdgeInsets.only(bottom: 20)),
+      ],
+    );
+  }
+}
+
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({required this.color, required this.count});
+
+  final Color? color;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = color == null ? 'Uncategorized' : '${_colorGroupName(color!)} group';
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color ?? AppTheme.border,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '($count)',
+          style: const TextStyle(color: Colors.black45, fontSize: 12),
+        ),
+      ],
+    );
   }
 }
 

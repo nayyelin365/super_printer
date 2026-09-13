@@ -26,8 +26,10 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
   String _initialTemp = '';
   DayTime? _stage1Time;
   String _stage1Temp = '';
+  String _stage1Initials = '';
   DayTime? _stage2Time;
   String _stage2Temp = '';
+  String _stage2Initials = '';
   String _correctiveAction = '';
   String _initials = '';
   bool _isSaving = false;
@@ -44,8 +46,10 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
     _initialTemp = e?.initialTempF?.toString() ?? '';
     _stage1Time = e?.stage1Time;
     _stage1Temp = e?.stage1TempF?.toString() ?? '';
+    _stage1Initials = e?.stage1Initials ?? '';
     _stage2Time = e?.stage2Time;
     _stage2Temp = e?.stage2TempF?.toString() ?? '';
+    _stage2Initials = e?.stage2Initials ?? '';
     _correctiveAction = e?.correctiveAction ?? '';
     _initials = e?.initials ?? '';
     if (e == null) {
@@ -76,8 +80,10 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
       initialTempF: _num(_initialTemp),
       stage1Time: _stage1Time,
       stage1TempF: _num(_stage1Temp),
+      stage1Initials: _stage1Initials.trim(),
       stage2Time: _stage2Time,
       stage2TempF: _num(_stage2Temp),
+      stage2Initials: _stage2Initials.trim(),
       correctiveAction: _correctiveAction.trim(),
       initials: _initials.trim(),
       createdAt: editing?.createdAt,
@@ -107,6 +113,8 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
         _stage2Time = null;
         _stage2Temp = '';
         _correctiveAction = '';
+        // Stage 1/2 Initial are intentionally kept — the same person is
+        // usually the one taking the next cooling reading too.
       });
     }
   }
@@ -185,6 +193,15 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
                             formKeySuffix: '$_formGeneration',
                             onChanged: (v) => _stage1Temp = v,
                           ),
+                          const LogFieldLabel('Stage 1 Initial'),
+                          TextFormField(
+                            key: ValueKey('stage1initials-$_formGeneration'),
+                            initialValue: _stage1Initials,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(hintText: 'e.g. NL'),
+                            onChanged: (v) => _stage1Initials = v,
+                          ),
+                          const SizedBox(height: 12),
                           _TimeRow(
                             label: 'Stage 2 — ≤ 41°F (within total 6 hr)',
                             time: _stage2Time,
@@ -201,6 +218,15 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
                             formKeySuffix: '$_formGeneration',
                             onChanged: (v) => _stage2Temp = v,
                           ),
+                          const LogFieldLabel('Stage 2 Initial'),
+                          TextFormField(
+                            key: ValueKey('stage2initials-$_formGeneration'),
+                            initialValue: _stage2Initials,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(hintText: 'e.g. NL'),
+                            onChanged: (v) => _stage2Initials = v,
+                          ),
+                          const SizedBox(height: 12),
                           const LogFieldLabel('Corrective Action'),
                           TextFormField(
                             initialValue: _correctiveAction,
