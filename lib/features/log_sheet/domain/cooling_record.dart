@@ -12,6 +12,7 @@ class CoolingRecord implements LogRecord {
     this.batchNo = '',
     this.coolingStart,
     this.initialTempF,
+    this.initialTempInitials = '',
     this.stage1Time,
     this.stage1TempF,
     this.stage1Initials = '',
@@ -37,6 +38,10 @@ class CoolingRecord implements LogRecord {
   /// Full date + time cooling began ("Cooling Start" column).
   final DateTime? coolingStart;
   final double? initialTempF;
+
+  /// Who took the Initial Temp reading.
+  final String initialTempInitials;
+
   final DayTime? stage1Time;
   final double? stage1TempF;
 
@@ -75,6 +80,7 @@ class CoolingRecord implements LogRecord {
     String? batchNo,
     DateTime? Function()? coolingStart,
     double? Function()? initialTempF,
+    String? initialTempInitials,
     DayTime? Function()? stage1Time,
     double? Function()? stage1TempF,
     String? stage1Initials,
@@ -91,6 +97,7 @@ class CoolingRecord implements LogRecord {
       batchNo: batchNo ?? this.batchNo,
       coolingStart: coolingStart != null ? coolingStart() : this.coolingStart,
       initialTempF: initialTempF != null ? initialTempF() : this.initialTempF,
+      initialTempInitials: initialTempInitials ?? this.initialTempInitials,
       stage1Time: stage1Time != null ? stage1Time() : this.stage1Time,
       stage1TempF: stage1TempF != null ? stage1TempF() : this.stage1TempF,
       stage1Initials: stage1Initials ?? this.stage1Initials,
@@ -112,6 +119,7 @@ class CoolingRecord implements LogRecord {
       batchNo: data['batchNo'] as String? ?? '',
       coolingStart: logRecordDateTimeFromMap(data, 'coolingStartMillis'),
       initialTempF: (data['initialTempF'] as num?)?.toDouble(),
+      initialTempInitials: data['initialTempInitials'] as String? ?? '',
       stage1Time: DayTime.fromMinutesOrNull(data['stage1TimeMin'] as int?),
       stage1TempF: (data['stage1TempF'] as num?)?.toDouble(),
       stage1Initials: data['stage1Initials'] as String? ?? '',
@@ -134,6 +142,7 @@ class CoolingRecord implements LogRecord {
       'batchNo': batchNo,
       if (coolingStart != null) 'coolingStartMillis': coolingStart!.millisecondsSinceEpoch,
       if (initialTempF != null) 'initialTempF': initialTempF,
+      'initialTempInitials': initialTempInitials,
       if (stage1Time != null) 'stage1TimeMin': stage1Time!.minutesSinceMidnight,
       if (stage1TempF != null) 'stage1TempF': stage1TempF,
       'stage1Initials': stage1Initials,

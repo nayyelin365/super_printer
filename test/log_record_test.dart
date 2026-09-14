@@ -50,7 +50,7 @@ void main() {
         amountAddingVinegar: '50 ml',
         inRangeAfterCorrection: true,
         discardOutOfRangeRice: false,
-        timeRiceAllUsed: const DayTime(15, 30),
+        timeRiceAllUsed: DateTime(2026, 8, 23, 15, 30),
         discardTimeAfterExpiry: const DayTime(16, 0),
         initials: 'NL',
       );
@@ -67,7 +67,7 @@ void main() {
       expect(restored.inRange, true);
       expect(restored.phAfterCorrected, 4.0);
       expect(restored.amountAddingVinegar, '50 ml');
-      expect(restored.timeRiceAllUsed, const DayTime(15, 30));
+      expect(restored.timeRiceAllUsed, DateTime(2026, 8, 23, 15, 30));
       expect(restored.initials, 'NL');
       expect(restored.createdAt, DateTime.fromMillisecondsSinceEpoch(1000));
     });
@@ -162,6 +162,7 @@ void main() {
         batchNo: 'B1',
         coolingStart: DateTime(2026, 9, 2, 12, 0),
         initialTempF: 170,
+        initialTempInitials: 'AB',
         stage1Time: const DayTime(14, 0),
         stage1TempF: 68,
         stage1Initials: 'NL',
@@ -173,6 +174,7 @@ void main() {
       );
       final restored = CoolingRecord.fromMap('r3', record.toMap());
       expect(restored.coolingStart, DateTime(2026, 9, 2, 12, 0));
+      expect(restored.initialTempInitials, 'AB');
       expect(restored.stage1Time, const DayTime(14, 0));
       expect(restored.stage1Initials, 'NL');
       expect(restored.stage2TempF, 40);
@@ -202,9 +204,8 @@ void main() {
         date: DateTime(2026, 9, 3),
         foodItemName: 'Sushi Rice',
         start: DateTime(2026, 9, 3, 12, 0),
-        startInitials: 'NL',
         actualTempF: 170,
-        actualTempInitials: 'NL',
+        startInitials: 'NL',
         checks: [
           for (final h in riceHotHoldOffsets)
             RiceHotHoldCheck(hourOffset: h, tempF: 150 + h.toDouble(), initials: 'NL'),
@@ -215,7 +216,6 @@ void main() {
       expect(restored.checkAt(6).tempF, 156);
       expect(restored.start, DateTime(2026, 9, 3, 12, 0));
       expect(restored.startInitials, 'NL');
-      expect(restored.actualTempInitials, 'NL');
     });
 
     test('round-trips finishedTime and discardTime', () {

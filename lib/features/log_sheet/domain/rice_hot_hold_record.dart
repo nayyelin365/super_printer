@@ -58,9 +58,8 @@ class RiceHotHoldRecord implements LogRecord {
     this.foodItemName = '',
     this.batchNo = '',
     this.start,
-    this.startInitials = '',
     this.actualTempF,
-    this.actualTempInitials = '',
+    this.startInitials = '',
     List<RiceHotHoldCheck>? checks,
     this.finishedTime,
     this.discardTime,
@@ -84,13 +83,11 @@ class RiceHotHoldRecord implements LogRecord {
   /// Full date + time hot holding began ("Start" column).
   final DateTime? start;
 
-  /// Who recorded the start time/temp.
-  final String startInitials;
-
   final double? actualTempF;
 
-  /// Who took the actual (start) temperature.
-  final String actualTempInitials;
+  /// Who took the start reading (date/time + actual temp) — shown as the
+  /// "Start Initial" column, right after Actual Temp.
+  final String startInitials;
 
   /// Always length 3, ordered by [riceHotHoldOffsets].
   final List<RiceHotHoldCheck> checks;
@@ -129,9 +126,8 @@ class RiceHotHoldRecord implements LogRecord {
     String? foodItemName,
     String? batchNo,
     DateTime? Function()? start,
-    String? startInitials,
     double? Function()? actualTempF,
-    String? actualTempInitials,
+    String? startInitials,
     List<RiceHotHoldCheck>? checks,
     DayTime? Function()? finishedTime,
     DayTime? Function()? discardTime,
@@ -144,9 +140,8 @@ class RiceHotHoldRecord implements LogRecord {
       foodItemName: foodItemName ?? this.foodItemName,
       batchNo: batchNo ?? this.batchNo,
       start: start != null ? start() : this.start,
-      startInitials: startInitials ?? this.startInitials,
       actualTempF: actualTempF != null ? actualTempF() : this.actualTempF,
-      actualTempInitials: actualTempInitials ?? this.actualTempInitials,
+      startInitials: startInitials ?? this.startInitials,
       checks: checks ?? this.checks,
       finishedTime: finishedTime != null ? finishedTime() : this.finishedTime,
       discardTime: discardTime != null ? discardTime() : this.discardTime,
@@ -175,9 +170,8 @@ class RiceHotHoldRecord implements LogRecord {
       foodItemName: data['foodItemName'] as String? ?? '',
       batchNo: data['batchNo'] as String? ?? '',
       start: logRecordDateTimeFromMap(data, 'startMillis'),
-      startInitials: data['startInitials'] as String? ?? '',
       actualTempF: (data['actualTempF'] as num?)?.toDouble(),
-      actualTempInitials: data['actualTempInitials'] as String? ?? '',
+      startInitials: data['startInitials'] as String? ?? '',
       checks: checks,
       finishedTime: DayTime.fromMinutesOrNull(data['finishedTimeMin'] as int?),
       discardTime: DayTime.fromMinutesOrNull(data['discardTimeMin'] as int?),
@@ -196,9 +190,8 @@ class RiceHotHoldRecord implements LogRecord {
       'foodItemName': foodItemName,
       'batchNo': batchNo,
       if (start != null) 'startMillis': start!.millisecondsSinceEpoch,
-      'startInitials': startInitials,
       if (actualTempF != null) 'actualTempF': actualTempF,
-      'actualTempInitials': actualTempInitials,
+      'startInitials': startInitials,
       'checks': [for (final c in checks) c.toMap()],
       if (finishedTime != null) 'finishedTimeMin': finishedTime!.minutesSinceMidnight,
       if (discardTime != null) 'discardTimeMin': discardTime!.minutesSinceMidnight,

@@ -24,9 +24,8 @@ class RiceHotHoldLogScreen extends ConsumerWidget {
         LogColumn('Food Item', (r) => r.foodItemName),
         LogColumn('Batch No', (r) => r.batchNo),
         LogColumn('Start', (r) => r.start == null ? '-' : logFormDateTimeFormat.format(r.start!)),
-        LogColumn('Start Initial', (r) => r.startInitials, narrow: true),
         LogColumn('Actual Temp', (r) => RiceHotHoldRecord.tempLabel(r.actualTempF), numeric: true, narrow: true),
-        LogColumn('Actual Temp Initial', (r) => r.actualTempInitials, narrow: true),
+        LogColumn('Start Initial', (r) => r.startInitials, narrow: true),
         for (final h in riceHotHoldOffsets) ...[
           LogColumn('+$h hr Time', (r) => r.checkAt(h).time.labelOrDash, narrow: true),
           LogColumn('+$h hr Temp', (r) => RiceHotHoldRecord.tempLabel(r.checkAt(h).tempF), numeric: true, narrow: true),

@@ -33,7 +33,7 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
   String _amountVinegar = '';
   bool? _inRangeAfterCorrection;
   bool? _discardOutOfRange;
-  DayTime? _timeRiceAllUsed;
+  DateTime? _timeRiceAllUsed;
   DayTime? _discardTimeAfterExpiry;
   String _initials = '';
   bool _isSaving = false;
@@ -61,11 +61,11 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
     _date = e?.date ?? DateTime(now.year, now.month, now.day);
     _phMeterCalibrated = e?.phMeterCalibrated;
     _riceBatchNo = e?.riceBatchNo ?? '';
-    // Start Cooking / Cooked default to right now for a brand-new entry
-    // (this is usually logged as it happens) rather than a fixed hour —
-    // every other time field here stays unset until picked.
+    // Start Cooking defaults to right now for a brand-new entry (this is
+    // usually logged as it starts happening) rather than a fixed hour —
+    // Cooked and every other time field here stays unset until picked.
     _timeStartCooking = e?.timeStartCooking ?? (e == null ? _now() : null);
-    _timeCooked = e?.timeCooked ?? (e == null ? _now() : null);
+    _timeCooked = e?.timeCooked;
     _timeAcidified = e?.timeAcidified;
     _ricePh = e?.ricePh?.toString() ?? '';
     _phAfterCorrected = e?.phAfterCorrected?.toString() ?? '';
@@ -153,7 +153,7 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
         _phMeterCalibrated = null;
         _riceBatchNo = '';
         _timeStartCooking = _now();
-        _timeCooked = _now();
+        _timeCooked = null;
         _timeAcidified = null;
         _ricePh = '';
         _phAfterCorrected = '';
@@ -253,8 +253,22 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
                               onChanged: (v) => setState(() => _discardOutOfRange = v),
                             ),
                           ],
-                          _time('Time Rice is all Used', _timeRiceAllUsed,
-                              (v) => setState(() => _timeRiceAllUsed = v)),
+                          LogPickerField(
+                            label: 'Time Rice is all Used',
+                            value: _timeRiceAllUsed == null
+                                ? 'Not set'
+                                : logFormDateTimeFormat.format(_timeRiceAllUsed!),
+                            onTap: () async {
+                              final picked = await pickLogDateTime(
+                                context,
+                                _timeRiceAllUsed ?? DateTime.now(),
+                              );
+                              if (picked != null) setState(() => _timeRiceAllUsed = picked);
+                            },
+                            onClear: _timeRiceAllUsed == null
+                                ? null
+                                : () => setState(() => _timeRiceAllUsed = null),
+                          ),
                           _time('Discard Time after Expiry', _discardTimeAfterExpiry,
                               (v) => setState(() => _discardTimeAfterExpiry = v)),
                           const LogFieldLabel("Tester's Initial"),

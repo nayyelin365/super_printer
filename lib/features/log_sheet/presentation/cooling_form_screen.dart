@@ -24,6 +24,7 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
   String _batchNo = '';
   DateTime? _coolingStart;
   String _initialTemp = '';
+  String _initialTempInitials = '';
   DayTime? _stage1Time;
   String _stage1Temp = '';
   String _stage1Initials = '';
@@ -44,6 +45,7 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
     _batchNo = e?.batchNo ?? '';
     _coolingStart = e?.coolingStart;
     _initialTemp = e?.initialTempF?.toString() ?? '';
+    _initialTempInitials = e?.initialTempInitials ?? '';
     _stage1Time = e?.stage1Time;
     _stage1Temp = e?.stage1TempF?.toString() ?? '';
     _stage1Initials = e?.stage1Initials ?? '';
@@ -78,6 +80,7 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
       batchNo: _batchNo.trim(),
       coolingStart: _coolingStart,
       initialTempF: _num(_initialTemp),
+      initialTempInitials: _initialTempInitials.trim(),
       stage1Time: _stage1Time,
       stage1TempF: _num(_stage1Temp),
       stage1Initials: _stage1Initials.trim(),
@@ -171,12 +174,21 @@ class _CoolingFormScreenState extends ConsumerState<CoolingFormScreen> {
                                 : () => setState(() => _coolingStart = null),
                           ),
                           LogNumberField(
-                            label: 'Initial Temp',
+                            label: 'Initial Temperature °F',
                             initialValue: _initialTemp,
                             hint: 'e.g. 170',
                             formKeySuffix: '$_formGeneration',
                             onChanged: (v) => _initialTemp = v,
                           ),
+                          const LogFieldLabel('Employee Initial'),
+                          TextFormField(
+                            key: ValueKey('initialtempinitials-$_formGeneration'),
+                            initialValue: _initialTempInitials,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(hintText: 'e.g. NL'),
+                            onChanged: (v) => _initialTempInitials = v,
+                          ),
+                          const SizedBox(height: 12),
                           _TimeRow(
                             label: 'Stage 1 — 135°F → 70°F (within 2 hr)',
                             time: _stage1Time,

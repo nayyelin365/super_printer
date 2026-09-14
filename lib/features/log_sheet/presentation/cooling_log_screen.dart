@@ -24,6 +24,7 @@ class CoolingLogScreen extends ConsumerWidget {
         LogColumn('Batch No', (r) => r.batchNo),
         LogColumn('Cooling Start', (r) => r.coolingStart == null ? '-' : logFormDateTimeFormat.format(r.coolingStart!)),
         LogColumn('Initial Temp', (r) => CoolingRecord.tempLabel(r.initialTempF), numeric: true, narrow: true),
+        LogColumn('Employee Initial', (r) => r.initialTempInitials, narrow: true),
         LogColumn('Stage 1 Time', (r) => r.stage1Time.labelOrDash, narrow: true),
         LogColumn('Stage 1 Temp', (r) => CoolingRecord.tempLabel(r.stage1TempF), numeric: true, narrow: true),
         LogColumn('Stage 1 Initial', (r) => r.stage1Initials, narrow: true),

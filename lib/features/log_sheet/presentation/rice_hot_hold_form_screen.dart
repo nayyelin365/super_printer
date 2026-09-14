@@ -24,9 +24,8 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
   String _foodItemName = '';
   String _batchNo = '';
   DateTime? _start;
-  String _startInitials = '';
   String _actualTemp = '';
-  String _actualTempInitials = '';
+  String _startInitials = '';
   late Map<int, DayTime?> _checkTimes;
   late Map<int, String> _checkTemps;
   late Map<int, String> _checkInitials;
@@ -45,9 +44,8 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
     _foodItemName = e?.foodItemName ?? '';
     _batchNo = e?.batchNo ?? '';
     _start = e?.start;
-    _startInitials = e?.startInitials ?? '';
     _actualTemp = e?.actualTempF?.toString() ?? '';
-    _actualTempInitials = e?.actualTempInitials ?? '';
+    _startInitials = e?.startInitials ?? '';
     _finishedTime = e?.finishedTime;
     _discardTime = e?.discardTime;
     _correctiveAction = e?.correctiveAction ?? '';
@@ -80,9 +78,8 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
       foodItemName: _foodItemName.trim(),
       batchNo: _batchNo.trim(),
       start: _start,
-      startInitials: _startInitials.trim(),
       actualTempF: _num(_actualTemp),
-      actualTempInitials: _actualTempInitials.trim(),
+      startInitials: _startInitials.trim(),
       checks: [
         for (final h in riceHotHoldOffsets)
           RiceHotHoldCheck(
@@ -117,9 +114,7 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
         _foodItemName = '';
         _batchNo = '';
         _start = null;
-        _startInitials = '';
         _actualTemp = '';
-        _actualTempInitials = '';
         _finishedTime = null;
         _discardTime = null;
         _correctiveAction = '';
@@ -176,15 +171,6 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
                             },
                             onClear: _start == null ? null : () => setState(() => _start = null),
                           ),
-                          const LogFieldLabel('Start Initial'),
-                          TextFormField(
-                            key: ValueKey('start-initials-$_formGeneration'),
-                            initialValue: _startInitials,
-                            textCapitalization: TextCapitalization.characters,
-                            decoration: const InputDecoration(hintText: 'e.g. NL'),
-                            onChanged: (v) => _startInitials = v,
-                          ),
-                          const SizedBox(height: 12),
                           LogNumberField(
                             label: 'Actual Temp °F (at start)',
                             initialValue: _actualTemp,
@@ -192,13 +178,13 @@ class _RiceHotHoldFormScreenState extends ConsumerState<RiceHotHoldFormScreen> {
                             formKeySuffix: '$_formGeneration',
                             onChanged: (v) => _actualTemp = v,
                           ),
-                          const LogFieldLabel('Actual Temp Initial'),
+                          const LogFieldLabel('Start Initial'),
                           TextFormField(
-                            key: ValueKey('actual-temp-initials-$_formGeneration'),
-                            initialValue: _actualTempInitials,
+                            key: ValueKey('start-initials-$_formGeneration'),
+                            initialValue: _startInitials,
                             textCapitalization: TextCapitalization.characters,
                             decoration: const InputDecoration(hintText: 'e.g. NL'),
-                            onChanged: (v) => _actualTempInitials = v,
+                            onChanged: (v) => _startInitials = v,
                           ),
                           const SizedBox(height: 12),
                           for (final h in riceHotHoldOffsets) ...[

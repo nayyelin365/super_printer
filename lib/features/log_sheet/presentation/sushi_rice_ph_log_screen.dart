@@ -8,6 +8,7 @@ import '../domain/sushi_rice_ph_record.dart';
 import 'export/log_record_excel.dart';
 import 'export/log_record_pdf.dart';
 import 'log_record_controller.dart';
+import 'widgets/log_form_fields.dart';
 import 'widgets/log_list_view.dart';
 
 String _yn(bool? v) => v == null ? '-' : (v ? 'Yes' : 'No');
@@ -33,7 +34,10 @@ class SushiRicePhLogScreen extends ConsumerWidget {
         LogColumn('pH After Correction', (r) => r.phAfterCorrectedLabel, numeric: true, narrow: true),
         LogColumn('In Range After?', (r) => _yn(r.inRangeAfterCorrection), narrow: true),
         LogColumn('Discarded?', (r) => _yn(r.discardOutOfRangeRice), narrow: true),
-        LogColumn('All Used', (r) => r.timeRiceAllUsed.labelOrDash),
+        LogColumn(
+          'All Used',
+          (r) => r.timeRiceAllUsed == null ? '-' : logFormDateTimeFormat.format(r.timeRiceAllUsed!),
+        ),
         LogColumn('Discard After Expiry', (r) => r.discardTimeAfterExpiry.labelOrDash),
         LogColumn('Tester', (r) => r.initials, narrow: true),
       ],

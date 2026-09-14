@@ -52,7 +52,12 @@ class SushiRicePhRecord implements LogRecord {
   final String amountAddingVinegar;
   final bool? inRangeAfterCorrection;
   final bool? discardOutOfRangeRice;
-  final DayTime? timeRiceAllUsed;
+
+  /// Full date + time the rice was all used up — unlike the other time
+  /// fields here, this can land on a later calendar day than [date], so it
+  /// carries its own date rather than just a time-of-day.
+  final DateTime? timeRiceAllUsed;
+
   final DayTime? discardTimeAfterExpiry;
 
   @override
@@ -93,7 +98,7 @@ class SushiRicePhRecord implements LogRecord {
     String? amountAddingVinegar,
     bool? Function()? inRangeAfterCorrection,
     bool? Function()? discardOutOfRangeRice,
-    DayTime? Function()? timeRiceAllUsed,
+    DateTime? Function()? timeRiceAllUsed,
     DayTime? Function()? discardTimeAfterExpiry,
     String? initials,
   }) {
@@ -136,7 +141,7 @@ class SushiRicePhRecord implements LogRecord {
       amountAddingVinegar: data['amountAddingVinegar'] as String? ?? '',
       inRangeAfterCorrection: data['inRangeAfterCorrection'] as bool?,
       discardOutOfRangeRice: data['discardOutOfRangeRice'] as bool?,
-      timeRiceAllUsed: DayTime.fromMinutesOrNull(data['timeRiceAllUsedMin'] as int?),
+      timeRiceAllUsed: logRecordDateTimeFromMap(data, 'timeRiceAllUsedMillis'),
       discardTimeAfterExpiry:
           DayTime.fromMinutesOrNull(data['discardTimeAfterExpiryMin'] as int?),
       initials: data['initials'] as String? ?? '',
@@ -161,7 +166,7 @@ class SushiRicePhRecord implements LogRecord {
       'amountAddingVinegar': amountAddingVinegar,
       if (inRangeAfterCorrection != null) 'inRangeAfterCorrection': inRangeAfterCorrection,
       if (discardOutOfRangeRice != null) 'discardOutOfRangeRice': discardOutOfRangeRice,
-      if (timeRiceAllUsed != null) 'timeRiceAllUsedMin': timeRiceAllUsed!.minutesSinceMidnight,
+      if (timeRiceAllUsed != null) 'timeRiceAllUsedMillis': timeRiceAllUsed!.millisecondsSinceEpoch,
       if (discardTimeAfterExpiry != null)
         'discardTimeAfterExpiryMin': discardTimeAfterExpiry!.minutesSinceMidnight,
       'initials': initials,
