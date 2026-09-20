@@ -41,6 +41,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Custom names for the food list's color groups — one doc per color,
+    // keyed by the color's ARGB int.
+    match /food_group_names/{colorValue} {
+      allow read, write: if true;
+    }
+
     // Receiving Log feature (items live in a subcollection under each invoice)
     match /receiving_invoices/{invoiceId} {
       allow read, write: if true;

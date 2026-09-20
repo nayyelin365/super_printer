@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/food_catalog_repository.dart';
+import '../data/food_group_name_repository.dart';
 import '../domain/food_catalog.dart';
 
 /// The food catalog, backed by [FoodCatalogRepository] (Firestore, shared
@@ -18,16 +19,32 @@ import '../domain/food_catalog.dart';
 /// (a synchronous list) needed to change — see the class doc on
 /// [FoodCatalog] for why this swap was designed to be invisible to them.
 class FoodCatalogController extends StateNotifier<List<FoodModel>> {
-  FoodCatalogController(this._repository) : super(FoodCatalog.breakfastMenu) {
+  FoodCatalogController(this._repository, {void Function()? onFirstLoad})
+      : _onFirstLoad = onFirstLoad,
+        super(FoodCatalog.breakfastMenu) {
     _init();
   }
 
   final FoodCatalogRepository _repository;
+
+  /// Called once the first Firestore snapshot (or error) arrives, so the UI
+  /// can tell "still loading" apart from "loaded, but empty".
+  final void Function()? _onFirstLoad;
   StreamSubscription<List<FoodModel>>? _subscription;
 
   Future<void> _init() async {
-    await _repository.ensureSeeded();
-    _subscription = _repository.watchAll().listen((items) => state = items);
+    try {
+      await _repository.ensureSeeded();
+    } catch (_) {
+      // Seeding is best-effort; the stream below still reports real state.
+    }
+    _subscription = _repository.watchAll().listen(
+      (items) {
+        state = items;
+        _onFirstLoad?.call();
+      },
+      onError: (Object _) => _onFirstLoad?.call(),
+    );
   }
 
   @override
@@ -86,9 +103,28 @@ final foodCatalogRepositoryProvider = Provider<FoodCatalogRepository>(
   (ref) => FoodCatalogRepository(),
 );
 
+/// False until the food catalog's first Firestore snapshot arrives — the
+/// list screen shows a spinner meanwhile instead of a misleading empty
+/// "No food found".
+final foodCatalogLoadedProvider = StateProvider<bool>((ref) => false);
+
 final foodCatalogProvider =
     StateNotifierProvider<FoodCatalogController, List<FoodModel>>(
-  (ref) => FoodCatalogController(ref.watch(foodCatalogRepositoryProvider)),
+  (ref) => FoodCatalogController(
+    ref.watch(foodCatalogRepositoryProvider),
+    onFirstLoad: () => ref.read(foodCatalogLoadedProvider.notifier).state = true,
+  ),
+);
+
+final foodGroupNameRepositoryProvider = Provider<FoodGroupNameRepository>(
+  (ref) => FoodGroupNameRepository(),
+);
+
+/// Live custom color-group names (color ARGB value -> name) — empty until
+/// loaded or when nothing has been renamed, in which case each group shows
+/// its default title.
+final foodGroupNamesProvider = StreamProvider<Map<int, String>>(
+  (ref) => ref.watch(foodGroupNameRepositoryProvider).watchAll(),
 );
 
 /// The current search box text, trimmed and lower-cased for matching.

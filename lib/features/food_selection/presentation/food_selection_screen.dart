@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/theme/app_theme.dart';
+import '../../../shared/utils/network_error.dart';
 import '../../label_printing/presentation/label_print_controller.dart';
 import '../../template_selection/presentation/template_selection_controller.dart';
 import '../domain/food_catalog.dart';
@@ -64,6 +65,7 @@ class FoodSelectionScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final foods = ref.watch(filteredFoodsProvider);
+    final loaded = ref.watch(foodCatalogLoadedProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.surface,
@@ -123,7 +125,9 @@ class FoodSelectionScreen extends ConsumerWidget {
               ),
             ),
             Expanded(
-              child: foods.isEmpty
+              child: !loaded
+                  ? const Center(child: CircularProgressIndicator())
+                  : foods.isEmpty
                   ? const Center(
                       child: Text(
                         'No food found',
@@ -264,15 +268,19 @@ class _GroupedFoodGrid extends StatelessWidget {
   }
 }
 
-class _GroupHeader extends StatelessWidget {
+class _GroupHeader extends ConsumerWidget {
   const _GroupHeader({required this.color, required this.count});
 
   final Color? color;
   final int count;
 
   @override
-  Widget build(BuildContext context) {
-    final label = color == null ? 'Uncategorized' : '${_colorGroupName(color!)} group';
+  Widget build(BuildContext context, WidgetRef ref) {
+    final defaultLabel = color == null ? 'Uncategorized' : '${_colorGroupName(color!)} group';
+    final customName =
+        color == null ? null : ref.watch(foodGroupNamesProvider).valueOrNull?[color!.toARGB32()];
+    final label = customName ?? defaultLabel;
+
     return Row(
       children: [
         Container(
@@ -284,17 +292,91 @@ class _GroupHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
         ),
         const SizedBox(width: 6),
         Text(
           '($count)',
           style: const TextStyle(color: Colors.black45, fontSize: 12),
         ),
+        // "Uncategorized" isn't a color group, so it has nothing to rename.
+        if (color != null)
+          IconButton(
+            onPressed: () => _editGroupName(context, ref, color!, customName ?? '', defaultLabel),
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            tooltip: 'Rename group',
+            visualDensity: VisualDensity.compact,
+            color: Colors.black45,
+          ),
       ],
     );
+  }
+}
+
+/// Asks for a new title for [color]'s group and saves it to Firestore
+/// (`food_group_names`). Saving a blank name restores the default title.
+Future<void> _editGroupName(
+  BuildContext context,
+  WidgetRef ref,
+  Color color,
+  String currentName,
+  String defaultLabel,
+) async {
+  // Tracked via onChanged (not a controller disposed after the dialog
+  // closes) — same reason as `showAddFoodDialog`.
+  var entered = currentName;
+  final result = await showDialog<String>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Rename Group'),
+        content: TextFormField(
+          autofocus: true,
+          initialValue: currentName,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            hintText: defaultLabel,
+            helperText: 'Leave blank to use the default name.',
+          ),
+          onChanged: (value) => entered = value,
+          onFieldSubmitted: (value) => Navigator.of(dialogContext).pop(value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(entered),
+            child: const Text('Save'),
+          ),
+        ],
+      );
+    },
+  );
+  if (result == null || !context.mounted) return;
+
+  if (!await hasNetworkConnection()) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Network error. Please check your internet connection.')),
+      );
+    }
+    return;
+  }
+  try {
+    await ref.read(foodGroupNameRepositoryProvider).setName(color.toARGB32(), result);
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(networkAwareErrorMessage(error))),
+      );
+    }
   }
 }
 

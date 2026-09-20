@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:super_printer/app.dart';
 import 'package:super_printer/features/food_selection/data/food_catalog_repository.dart';
+import 'package:super_printer/features/food_selection/data/food_group_name_repository.dart';
 import 'package:super_printer/features/food_selection/presentation/food_selection_controller.dart';
 
 void main() {
@@ -24,6 +25,9 @@ void main() {
         overrides: [
           foodCatalogRepositoryProvider.overrideWithValue(
             FoodCatalogRepository(firestore: FakeFirebaseFirestore()),
+          ),
+          foodGroupNameRepositoryProvider.overrideWithValue(
+            FoodGroupNameRepository(firestore: FakeFirebaseFirestore()),
           ),
         ],
         child: const SuperPrinterApp(),
