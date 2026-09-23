@@ -28,6 +28,7 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
   DayTime? _timeStartCooking;
   DayTime? _timeCooked;
   DayTime? _timeAcidified;
+  DayTime? _timePhMeasurement;
   String _ricePh = '';
   String _phAfterCorrected = '';
   String _amountVinegar = '';
@@ -67,6 +68,7 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
     _timeStartCooking = e?.timeStartCooking ?? (e == null ? _now() : null);
     _timeCooked = e?.timeCooked;
     _timeAcidified = e?.timeAcidified;
+    _timePhMeasurement = e?.timePhMeasurement;
     _ricePh = e?.ricePh?.toString() ?? '';
     _phAfterCorrected = e?.phAfterCorrected?.toString() ?? '';
     _amountVinegar = e?.amountAddingVinegar ?? '';
@@ -124,6 +126,7 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
       timeStartCooking: _timeStartCooking,
       timeCooked: _timeCooked,
       timeAcidified: _timeAcidified,
+      timePhMeasurement: _timePhMeasurement,
       ricePh: _num(_ricePh),
       phAfterCorrected: outOfRange ? _num(_phAfterCorrected) : null,
       amountAddingVinegar: outOfRange ? _amountVinegar.trim() : '',
@@ -155,6 +158,7 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
         _timeStartCooking = _now();
         _timeCooked = null;
         _timeAcidified = null;
+        _timePhMeasurement = null;
         _ricePh = '';
         _phAfterCorrected = '';
         _amountVinegar = '';
@@ -216,6 +220,8 @@ class _SushiRicePhFormScreenState extends ConsumerState<SushiRicePhFormScreen> {
                               (v) => setState(() => _timeCooked = v)),
                           _time('Time Acidified', _timeAcidified,
                               (v) => setState(() => _timeAcidified = v)),
+                          _time('Time pH Measurement', _timePhMeasurement,
+                              (v) => setState(() => _timePhMeasurement = v)),
                           LogNumberField(
                             label: 'Rice pH',
                             initialValue: _ricePh,

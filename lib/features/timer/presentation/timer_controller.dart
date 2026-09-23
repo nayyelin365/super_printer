@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -32,10 +33,58 @@ class TimerController extends StateNotifier<List<KitchenTimer>> {
   final Ref _ref;
   late final Timer _ticker;
 
+  /// Players currently ringing for finished timers, by timer id.
+  final Map<String, AudioPlayer> _players = {};
+
   @override
   void dispose() {
     _ticker.cancel();
+    for (final player in _players.values) {
+      player.dispose();
+    }
+    _players.clear();
     super.dispose();
+  }
+
+  /// Plays the timer's sound right inside the app — the notification alone
+  /// isn't dependable on every Android device this runs on (kiosk-style
+  /// Android boxes and tablets can have notification sound/alert settings
+  /// off or missing entirely), and a timer that hits zero in front of the
+  /// user should always be audible. Loops until dismissed when
+  /// [KitchenTimer.repeatSound] is on. Once playback has actually started,
+  /// the OS notification for the same moment is cancelled so the sound
+  /// doesn't double up; if playback fails, the notification is left alone
+  /// as the fallback.
+  Future<void> _ring(KitchenTimer timer) async {
+    final asset = alarmSoundById(timer.soundId).assetPath;
+    if (asset == null || _players.containsKey(timer.id)) return;
+    final player = AudioPlayer();
+    _players[timer.id] = player;
+    try {
+      await player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            usageType: AndroidUsageType.alarm,
+            contentType: AndroidContentType.sonification,
+            audioFocus: AndroidAudioFocus.gain,
+          ),
+        ),
+      );
+      await player.setReleaseMode(timer.repeatSound ? ReleaseMode.loop : ReleaseMode.release);
+      await player.play(AssetSource(asset.replaceFirst('assets/', '')));
+      final notificationId = _notificationIdFor(timer.id);
+      await cancelNotification(notificationId);
+    } catch (_) {
+      _players.remove(timer.id);
+      await player.dispose();
+    }
+  }
+
+  Future<void> _stopRinging(String timerId) async {
+    final player = _players.remove(timerId);
+    if (player == null) return;
+    await player.stop();
+    await player.dispose();
   }
 
   int _notificationIdFor(String timerId) => stableAlarmBaseId(timerId) * 10 + _timerSubId;
@@ -49,12 +98,16 @@ class TimerController extends StateNotifier<List<KitchenTimer>> {
       if (state.any((t) => t.isRunning)) state = [...state];
       return;
     }
+    final finished = justFinished.toList();
     state = [
       for (final t in state)
-        justFinished.contains(t)
+        finished.contains(t)
             ? t.copyWith(endAt: () => null, notificationId: () => null, isFinished: true)
             : t,
     ];
+    for (final timer in finished) {
+      _ring(timer);
+    }
   }
 
   /// Starts a new timer for [duration]. Requests notification permission
@@ -150,6 +203,7 @@ class TimerController extends StateNotifier<List<KitchenTimer>> {
   /// Removes a timer — cancels its scheduled notification if it's still
   /// running (paused/finished timers have none scheduled).
   Future<void> removeTimer(String id) async {
+    await _stopRinging(id);
     final timer = state.where((t) => t.id == id).firstOrNull;
     if (timer?.notificationId != null) {
       await cancelNotification(timer!.notificationId!);

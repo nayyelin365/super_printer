@@ -22,6 +22,12 @@ const _foodCategoryColors = [
   Color(0xFF9C36B5),
   Color(0xFFE64980),
   Color(0xFF495057),
+  Color(0xFF74B816),
+  Color(0xFF15AABF),
+  Color(0xFF4DABF7),
+  Color(0xFFB197FC),
+  Color(0xFF8D5A2B),
+  Color(0xFF7A1F2B),
 ];
 
 /// Display name for each swatch above, in the same order — used as the
@@ -38,6 +44,12 @@ const _foodCategoryColorNames = [
   'Purple',
   'Pink',
   'Gray',
+  'Lime',
+  'Cyan',
+  'Sky',
+  'Lavender',
+  'Brown',
+  'Maroon',
 ];
 
 String _colorGroupName(Color color) {
@@ -246,19 +258,16 @@ class _GroupedFoodGrid extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             sliver: SliverGrid(
               gridDelegate: _gridDelegate,
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final food = group.$2[index];
-                  return FoodCard(
-                    name: food.name,
-                    color: food.color,
-                    targetTemperature: food.targetTemperature,
-                    onSelect: () => onSelect(food),
-                    onRemove: () => onRemove(food),
-                  );
-                },
-                childCount: group.$2.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final food = group.$2[index];
+                return FoodCard(
+                  name: food.name,
+                  color: food.color,
+                  targetTemperature: food.targetTemperature,
+                  onSelect: () => onSelect(food),
+                  onRemove: () => onRemove(food),
+                );
+              }, childCount: group.$2.length),
             ),
           ),
         ],
@@ -276,9 +285,12 @@ class _GroupHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final defaultLabel = color == null ? 'Uncategorized' : '${_colorGroupName(color!)} group';
-    final customName =
-        color == null ? null : ref.watch(foodGroupNamesProvider).valueOrNull?[color!.toARGB32()];
+    final defaultLabel = color == null
+        ? 'Uncategorized'
+        : '${_colorGroupName(color!)} group';
+    final customName = color == null
+        ? null
+        : ref.watch(foodGroupNamesProvider).valueOrNull?[color!.toARGB32()];
     final label = customName ?? defaultLabel;
 
     return Row(
@@ -307,7 +319,13 @@ class _GroupHeader extends ConsumerWidget {
         // "Uncategorized" isn't a color group, so it has nothing to rename.
         if (color != null)
           IconButton(
-            onPressed: () => _editGroupName(context, ref, color!, customName ?? '', defaultLabel),
+            onPressed: () => _editGroupName(
+              context,
+              ref,
+              color!,
+              customName ?? '',
+              defaultLabel,
+            ),
             icon: const Icon(Icons.edit_outlined, size: 16),
             tooltip: 'Rename group',
             visualDensity: VisualDensity.compact,
@@ -364,18 +382,24 @@ Future<void> _editGroupName(
   if (!await hasNetworkConnection()) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Network error. Please check your internet connection.')),
+        const SnackBar(
+          content: Text(
+            'Network error. Please check your internet connection.',
+          ),
+        ),
       );
     }
     return;
   }
   try {
-    await ref.read(foodGroupNameRepositoryProvider).setName(color.toARGB32(), result);
+    await ref
+        .read(foodGroupNameRepositoryProvider)
+        .setName(color.toARGB32(), result);
   } catch (error) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(networkAwareErrorMessage(error))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(networkAwareErrorMessage(error))));
     }
   }
 }
@@ -405,98 +429,101 @@ Future<void> showAddFoodDialog(BuildContext context, WidgetRef ref) async {
             builder: (dialogContext, setState) {
               return AlertDialog(
                 title: const Text('Add Food'),
-                content: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextFormField(
-                        autofocus: true,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: const InputDecoration(
-                          hintText: 'Food name',
-                        ),
-                        onChanged: (value) => enteredName = value,
-                        validator: (value) =>
-                            (value == null || value.trim().isEmpty)
-                            ? 'Enter a food name'
-                            : null,
-                        onFieldSubmitted: (value) {
-                          if (formKey.currentState!.validate()) {
-                            Navigator.of(dialogContext).pop((
-                              name: value.trim(),
-                              color: selectedColor,
-                              targetTemperature: double.tryParse(
-                                enteredTargetTemperature,
-                              ),
-                            ));
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: 'Target Temperature (optional)',
-                          suffixText: '°F',
-                        ),
-                        onChanged: (value) => enteredTargetTemperature = value,
-                        validator: (value) =>
-                            (value != null &&
-                                value.trim().isNotEmpty &&
-                                double.tryParse(value) == null)
-                            ? 'Enter a valid number'
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Category color (optional)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black54,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          for (final color in _foodCategoryColors)
-                            GestureDetector(
-                              onTap: () => setState(
-                                () => selectedColor = selectedColor == color
-                                    ? null
-                                    : color,
-                              ),
-                              child: Container(
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: selectedColor == color
-                                        ? Colors.black87
-                                        : Colors.transparent,
-                                    width: 2,
-                                  ),
+                content: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            hintText: 'Food name',
+                          ),
+                          onChanged: (value) => enteredName = value,
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty)
+                              ? 'Enter a food name'
+                              : null,
+                          onFieldSubmitted: (value) {
+                            if (formKey.currentState!.validate()) {
+                              Navigator.of(dialogContext).pop((
+                                name: value.trim(),
+                                color: selectedColor,
+                                targetTemperature: double.tryParse(
+                                  enteredTargetTemperature,
                                 ),
-                                child: selectedColor == color
-                                    ? const Icon(
-                                        Icons.check,
-                                        size: 16,
-                                        color: Colors.white,
-                                      )
-                                    : null,
+                              ));
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // TextFormField(
+                        //   keyboardType: const TextInputType.numberWithOptions(
+                        //     decimal: true,
+                        //   ),
+                        //   decoration: const InputDecoration(
+                        //     hintText: 'Target Temperature (optional)',
+                        //     suffixText: '°F',
+                        //   ),
+                        //   onChanged: (value) =>
+                        //       enteredTargetTemperature = value,
+                        //   validator: (value) =>
+                        //       (value != null &&
+                        //           value.trim().isNotEmpty &&
+                        //           double.tryParse(value) == null)
+                        //       ? 'Enter a valid number'
+                        //       : null,
+                        // ),
+                        // const SizedBox(height: 16),
+                        const Text(
+                          'Category color (optional)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            for (final color in _foodCategoryColors)
+                              GestureDetector(
+                                onTap: () => setState(
+                                  () => selectedColor = selectedColor == color
+                                      ? null
+                                      : color,
+                                ),
+                                child: Container(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: selectedColor == color
+                                          ? Colors.black87
+                                          : Colors.transparent,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: selectedColor == color
+                                      ? const Icon(
+                                          Icons.check,
+                                          size: 16,
+                                          color: Colors.white,
+                                        )
+                                      : null,
+                                ),
                               ),
-                            ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 actions: [

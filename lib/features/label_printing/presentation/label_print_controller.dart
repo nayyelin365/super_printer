@@ -392,9 +392,17 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
   /// saved Use By hours, employee, and pH (see [saveCurrentFoodSettings]),
   /// a Food Rotation label pre-fills those instead of the bare defaults.
   void startNewLabel(LabelTemplate template, {String? foodName, FoodModel? food}) {
+    final mode = UseByMode.values.asNameMap()[food?.useByMode] ?? UseByMode.hours;
+    var labelData = _freshData(template, foodName: foodName, food: food);
+    // A food saved in Date & Time mode reopens showing that exact saved
+    // date/time, not an hours-based recalculation.
+    if (mode == UseByMode.dateTime && food?.useByAt != null && labelData is FoodRotationLabelData) {
+      labelData = labelData.copyWith(useBy: food!.useByAt);
+    }
     state = LabelPrintState(
-      labelData: _freshData(template, foodName: foodName, food: food),
+      labelData: labelData,
       useByAmount: food?.useByHours ?? 48,
+      useByMode: mode,
       formGeneration: state.formGeneration + 1,
     );
   }
@@ -438,6 +446,10 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     _ref.read(foodCatalogProvider.notifier).saveFoodSettings(
           name,
           useByHours: state.useByAmount,
+          useByMode: state.useByMode.name,
+          // In Date & Time mode the exact picked date/time is saved too
+          // (hours alone would reopen as an hours-based recalculation).
+          useByAt: state.useByMode == UseByMode.dateTime ? data.useBy : null,
           employee: data.employee.trim().isEmpty ? null : data.employee.trim(),
           ph: data.showPh && data.ph.trim().isNotEmpty ? data.ph.trim() : null,
         );

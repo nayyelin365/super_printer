@@ -45,6 +45,7 @@ void main() {
         timeStartCooking: const DayTime(8, 0),
         timeCooked: const DayTime(8, 40),
         timeAcidified: const DayTime(9, 0),
+        timePhMeasurement: const DayTime(9, 10),
         ricePh: 4.1,
         phAfterCorrected: 4.0,
         amountAddingVinegar: '50 ml',
@@ -63,6 +64,7 @@ void main() {
       expect(restored.phMeterCalibrated, true);
       expect(restored.riceBatchNo, 'Batch-2026-0002');
       expect(restored.timeStartCooking, const DayTime(8, 0));
+      expect(restored.timePhMeasurement, const DayTime(9, 10));
       expect(restored.ricePh, 4.1);
       expect(restored.inRange, true);
       expect(restored.phAfterCorrected, 4.0);

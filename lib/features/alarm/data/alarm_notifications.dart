@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -199,7 +200,7 @@ Future<void> _zonedSchedule({
   // saving the batch just because the browser can't set a native alarm).
   if (kIsWeb) return Future.value();
 
-  return _plugin.zonedSchedule(
+  Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
     id: id,
     title: title,
     body: body,
@@ -214,7 +215,7 @@ Future<void> _zonedSchedule({
       'repeatSound': repeatSound,
     }),
     scheduledDate: tz.TZDateTime.from(at, tz.local),
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    androidScheduleMode: mode,
     matchDateTimeComponents: matchDateTimeComponents,
     notificationDetails: NotificationDetails(
       android: AndroidNotificationDetails(
@@ -251,6 +252,19 @@ Future<void> _zonedSchedule({
       ),
     ),
   );
+
+  // Exact alarms need the "Alarms & reminders" permission on Android 12+,
+  // which some devices (and Android 14's default for fresh installs) leave
+  // denied — the plugin then throws `exact_alarms_not_permitted` and the
+  // alarm/timer would silently never exist. Fall back to an inexact
+  // (still Doze-piercing, but possibly a little late) schedule instead of
+  // failing.
+  return schedule(AndroidScheduleMode.exactAllowWhileIdle).catchError((Object error) {
+    if (error is PlatformException && error.code == 'exact_alarms_not_permitted') {
+      return schedule(AndroidScheduleMode.inexactAllowWhileIdle);
+    }
+    throw error;
+  });
 }
 
 Future<void> cancelNotification(int id) => _plugin.cancel(id: id);

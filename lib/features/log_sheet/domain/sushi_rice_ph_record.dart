@@ -24,6 +24,7 @@ class SushiRicePhRecord implements LogRecord {
     this.timeStartCooking,
     this.timeCooked,
     this.timeAcidified,
+    this.timePhMeasurement,
     this.ricePh,
     this.phAfterCorrected,
     this.amountAddingVinegar = '',
@@ -46,6 +47,9 @@ class SushiRicePhRecord implements LogRecord {
   final DayTime? timeStartCooking;
   final DayTime? timeCooked;
   final DayTime? timeAcidified;
+
+  /// When the pH was actually measured (after acidifying).
+  final DayTime? timePhMeasurement;
   final double? ricePh;
 
   final double? phAfterCorrected;
@@ -93,6 +97,7 @@ class SushiRicePhRecord implements LogRecord {
     DayTime? Function()? timeStartCooking,
     DayTime? Function()? timeCooked,
     DayTime? Function()? timeAcidified,
+    DayTime? Function()? timePhMeasurement,
     double? Function()? ricePh,
     double? Function()? phAfterCorrected,
     String? amountAddingVinegar,
@@ -111,6 +116,8 @@ class SushiRicePhRecord implements LogRecord {
       timeStartCooking: timeStartCooking != null ? timeStartCooking() : this.timeStartCooking,
       timeCooked: timeCooked != null ? timeCooked() : this.timeCooked,
       timeAcidified: timeAcidified != null ? timeAcidified() : this.timeAcidified,
+      timePhMeasurement:
+          timePhMeasurement != null ? timePhMeasurement() : this.timePhMeasurement,
       ricePh: ricePh != null ? ricePh() : this.ricePh,
       phAfterCorrected: phAfterCorrected != null ? phAfterCorrected() : this.phAfterCorrected,
       amountAddingVinegar: amountAddingVinegar ?? this.amountAddingVinegar,
@@ -136,6 +143,7 @@ class SushiRicePhRecord implements LogRecord {
       timeStartCooking: DayTime.fromMinutesOrNull(data['timeStartCookingMin'] as int?),
       timeCooked: DayTime.fromMinutesOrNull(data['timeCookedMin'] as int?),
       timeAcidified: DayTime.fromMinutesOrNull(data['timeAcidifiedMin'] as int?),
+      timePhMeasurement: DayTime.fromMinutesOrNull(data['timePhMeasurementMin'] as int?),
       ricePh: (data['ricePh'] as num?)?.toDouble(),
       phAfterCorrected: (data['phAfterCorrected'] as num?)?.toDouble(),
       amountAddingVinegar: data['amountAddingVinegar'] as String? ?? '',
@@ -160,6 +168,8 @@ class SushiRicePhRecord implements LogRecord {
       if (timeStartCooking != null) 'timeStartCookingMin': timeStartCooking!.minutesSinceMidnight,
       if (timeCooked != null) 'timeCookedMin': timeCooked!.minutesSinceMidnight,
       if (timeAcidified != null) 'timeAcidifiedMin': timeAcidified!.minutesSinceMidnight,
+      if (timePhMeasurement != null)
+        'timePhMeasurementMin': timePhMeasurement!.minutesSinceMidnight,
       if (ricePh != null) 'ricePh': ricePh,
       // `inRange` itself isn't stored — it's derived from `ricePh` on read.
       if (phAfterCorrected != null) 'phAfterCorrected': phAfterCorrected,

@@ -83,6 +83,8 @@ class FoodCatalogController extends StateNotifier<List<FoodModel>> {
   Future<void> saveFoodSettings(
     String name, {
     int? useByHours,
+    String? useByMode,
+    DateTime? useByAt,
     String? employee,
     String? ph,
   }) async {
@@ -92,6 +94,8 @@ class FoodCatalogController extends StateNotifier<List<FoodModel>> {
     await _repository.setFood(
       existing.copyWith(
         useByHours: () => useByHours,
+        useByMode: () => useByMode,
+        useByAt: () => useByAt,
         employee: () => employee,
         ph: () => ph,
       ),

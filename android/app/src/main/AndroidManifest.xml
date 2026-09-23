@@ -26,6 +26,17 @@
          here. See the plugin's AndroidManifest.xml setup instructions. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Android 13+: auto-granted to alarm/timer apps, so exact scheduling
+         works without the user hunting for "Alarms & reminders" in
+         Settings. SCHEDULE_EXACT_ALARM above covers Android 12. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Explicit (rather than relying on the plugin's manifest merge, which
+         differs by plugin version): notification permission prompt on
+         Android 13+, sound + vibration + full-screen alert on Android 14+. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:label="Smart Printer"

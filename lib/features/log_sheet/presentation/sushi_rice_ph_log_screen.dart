@@ -29,6 +29,7 @@ class SushiRicePhLogScreen extends ConsumerWidget {
         LogColumn('Start Cooking', (r) => r.timeStartCooking.labelOrDash),
         LogColumn('Cooked', (r) => r.timeCooked.labelOrDash),
         LogColumn('Acidified', (r) => r.timeAcidified.labelOrDash),
+        LogColumn('pH Measured', (r) => r.timePhMeasurement.labelOrDash),
         LogColumn('Rice pH', (r) => r.ricePhLabel, numeric: true, narrow: true),
         LogColumn('In Range?', (r) => _yn(r.inRange), narrow: true),
         LogColumn('pH After Correction', (r) => r.phAfterCorrectedLabel, numeric: true, narrow: true),
