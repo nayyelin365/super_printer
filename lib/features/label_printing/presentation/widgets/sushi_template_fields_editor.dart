@@ -18,7 +18,7 @@ import '../sushi_preset_controller.dart';
 class SushiTemplateFieldsEditor extends ConsumerWidget {
   const SushiTemplateFieldsEditor({super.key});
 
-  static final _dateTimeFormat = DateFormat('MM/dd/yyyy hh:mm a');
+  static final _dateFormat = DateFormat('MM/dd/yyyy');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -67,14 +67,14 @@ class SushiTemplateFieldsEditor extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
 
-        _LabeledDateTimeField(
-          fieldLabel: 'Sell Through — label',
+        _SellThroughField(
           fieldKey: 'sushi-bestifuselabel-${state.formGeneration}',
           labelValue: data.bestIfUseByLabel,
           onLabelChanged: controller.updateSushiBestIfUseByLabel,
-          dateTime: data.bestIfUseByAt,
-          dateTimeFormat: _dateTimeFormat,
-          onPick: (value) => controller.updateSushiBestIfUseByAt(value),
+          daysFieldKey: 'sushi-bestifusedays-${state.formGeneration}',
+          sellThroughAt: data.bestIfUseByAt,
+          dateFormat: _dateFormat,
+          onDaysChanged: controller.updateSushiBestIfUseByDays,
         ),
         const SizedBox(height: 16),
 
@@ -147,7 +147,8 @@ class SushiTemplateFieldsEditor extends ConsumerWidget {
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             labelText: 'Barcode Value',
-            helperText: '${data.barcodeType.digitLength} digits, including the check digit',
+            helperText:
+                '${data.barcodeType.payloadLength} digits — the check digit is added automatically',
             errorText: barcodeError,
           ),
           onChanged: controller.updateSushiBarcodeValue,
@@ -328,74 +329,65 @@ class _PresetRow extends ConsumerWidget {
   }
 }
 
-class _LabeledDateTimeField extends StatelessWidget {
-  const _LabeledDateTimeField({
-    required this.fieldLabel,
+/// Sell Through's label text, plus a plain "days from today" number box
+/// (no date/time picker) — typing `2` sets Sell Through to today + 2 days,
+/// shown date-only (no time) right below for confirmation.
+class _SellThroughField extends StatelessWidget {
+  const _SellThroughField({
     required this.fieldKey,
     required this.labelValue,
     required this.onLabelChanged,
-    required this.dateTime,
-    required this.dateTimeFormat,
-    required this.onPick,
+    required this.daysFieldKey,
+    required this.sellThroughAt,
+    required this.dateFormat,
+    required this.onDaysChanged,
   });
 
-  final String fieldLabel;
   final String fieldKey;
   final String labelValue;
   final ValueChanged<String> onLabelChanged;
-  final DateTime dateTime;
-  final DateFormat dateTimeFormat;
-  final ValueChanged<DateTime> onPick;
+  final String daysFieldKey;
+  final DateTime sellThroughAt;
+  final DateFormat dateFormat;
+  final ValueChanged<int> onDaysChanged;
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final initialDays = sellThroughAt.difference(today).inDays.clamp(0, 1 << 30);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextFormField(
           key: ValueKey(fieldKey),
           initialValue: labelValue,
-          decoration: InputDecoration(labelText: fieldLabel),
+          decoration: const InputDecoration(labelText: 'Sell Through — label'),
           onChanged: onLabelChanged,
         ),
-        const SizedBox(height: 6),
-        InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => _pick(context),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppTheme.border),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Expanded(child: Text(dateTimeFormat.format(dateTime))),
-                const Icon(Icons.edit_calendar_outlined, size: 18, color: Colors.black45),
-              ],
-            ),
+        const SizedBox(height: 12),
+        TextFormField(
+          key: ValueKey(daysFieldKey),
+          initialValue: '$initialDays',
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Days until Sell Through',
+            hintText: 'e.g. 2',
+            suffixText: 'days from today',
           ),
+          onChanged: (value) {
+            final parsed = int.tryParse(value);
+            if (parsed != null) onDaysChanged(parsed);
+          },
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Sell Through: ${dateFormat.format(sellThroughAt)}',
+          style: const TextStyle(fontSize: 12, color: Colors.black54),
         ),
       ],
     );
-  }
-
-  Future<void> _pick(BuildContext context) async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: dateTime,
-      firstDate: DateTime(dateTime.year - 1),
-      lastDate: DateTime(dateTime.year + 5),
-    );
-    if (date == null || !context.mounted) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(dateTime),
-    );
-    if (time == null) return;
-
-    onPick(DateTime(date.year, date.month, date.day, time.hour, time.minute));
   }
 }
 

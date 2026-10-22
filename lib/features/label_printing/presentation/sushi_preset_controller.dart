@@ -30,6 +30,16 @@ class SushiPresetController extends StateNotifier<List<SushiLabelPreset>> {
   final void Function()? _onFirstLoad;
   StreamSubscription<List<SushiLabelPreset>>? _subscription;
 
+  /// Whole days from today's date to [at] — the inverse of
+  /// [sushiLabelDataFromPreset]'s `today.add(Duration(days: ...))`, so
+  /// saving a preset captures the number the user actually typed rather
+  /// than a date that would go stale.
+  static int _daysUntil(DateTime at) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return at.difference(today).inDays.clamp(0, 1 << 30);
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();
@@ -64,6 +74,7 @@ class SushiPresetController extends StateNotifier<List<SushiLabelPreset>> {
         fullyCookedText: data.fullyCookedText,
         netWeightText: data.netWeightText,
         bestIfUseByLabel: data.bestIfUseByLabel,
+        bestIfUseByDays: _daysUntil(data.bestIfUseByAt),
         processedOnLabel: data.processedOnLabel,
         price: data.price,
         rollDescription: data.rollDescription,
@@ -98,6 +109,7 @@ class SushiPresetController extends StateNotifier<List<SushiLabelPreset>> {
       fullyCookedText: data.fullyCookedText,
       netWeightText: data.netWeightText,
       bestIfUseByLabel: data.bestIfUseByLabel,
+      bestIfUseByDays: _daysUntil(data.bestIfUseByAt),
       processedOnLabel: data.processedOnLabel,
       price: data.price,
       rollDescription: data.rollDescription,
@@ -111,20 +123,19 @@ class SushiPresetController extends StateNotifier<List<SushiLabelPreset>> {
 }
 
 /// Converts a saved [SushiLabelPreset] back into [SushiTemplateLabelData]
-/// for a fresh print job — Best If Use By / Processed On are always set to
-/// "now" (+ offset), never the stale moment the preset happened to be
-/// saved at.
-SushiTemplateLabelData sushiLabelDataFromPreset(
-  SushiLabelPreset preset, {
-  Duration bestIfUseByOffset = const Duration(hours: 24),
-}) {
+/// for a fresh print job. Best If Use By is [SushiLabelPreset.bestIfUseByDays]
+/// applied to *today's* date — the saved day count carries over, but it's
+/// always computed from today, never a stale saved absolute date.
+/// Processed On always resets to "now".
+SushiTemplateLabelData sushiLabelDataFromPreset(SushiLabelPreset preset) {
   final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
   return SushiTemplateLabelData(
     productTitle: preset.productTitle,
     fullyCookedText: preset.fullyCookedText,
     netWeightText: preset.netWeightText,
     bestIfUseByLabel: preset.bestIfUseByLabel,
-    bestIfUseByAt: now.add(bestIfUseByOffset),
+    bestIfUseByAt: today.add(Duration(days: preset.bestIfUseByDays)),
     processedOnLabel: preset.processedOnLabel,
     processedOnAt: now,
     price: preset.price,

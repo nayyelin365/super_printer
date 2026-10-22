@@ -30,7 +30,7 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
   static const _barcodeHeight = 180.0;
   static const _barcodeWidth = 560.0;
 
-  static final _dateFormat = DateFormat('MM/dd/yyyy hh:mm a');
+  static final _dateFormat = DateFormat('MM/dd/yyyy');
 
   double get _contentLeft => _margin;
   double get _contentRight => designWidth - _margin;
@@ -122,9 +122,12 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
     );
     cursor = (sellThroughBottom > priceBottom ? sellThroughBottom : priceBottom) + 30;
 
-    cursor = _drawWrapped(canvas, data.rollDescription, cursor);
+    // Same font size as the product title (food name), per request.
+    const descriptionStyle =
+        TextStyle(color: Colors.black,  fontSize: 36);
+    cursor = _drawWrapped(canvas, data.rollDescription, cursor, style: descriptionStyle);
     cursor += 18;
-    cursor = _drawWrapped(canvas, data.topDescription, cursor);
+    cursor = _drawWrapped(canvas, data.topDescription, cursor, style: descriptionStyle);
     cursor += 26;
 
     cursor = _drawBoxedLines(

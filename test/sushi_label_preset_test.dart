@@ -13,6 +13,7 @@ void main() {
       fullyCookedText: 'FULLY COOKED',
       netWeightText: 'Net Wt: 8.5 oz (241 g)',
       bestIfUseByLabel: 'Best If Use By',
+      bestIfUseByDays: 3,
       processedOnLabel: 'Processed On',
       price: 9.99,
       rollDescription: 'ROLL: IMITATION CRAB, AVOCADO, CUCUMBER.',
@@ -34,6 +35,7 @@ void main() {
       expect(restored.fullyCookedText, preset.fullyCookedText);
       expect(restored.netWeightText, preset.netWeightText);
       expect(restored.bestIfUseByLabel, preset.bestIfUseByLabel);
+      expect(restored.bestIfUseByDays, preset.bestIfUseByDays);
       expect(restored.processedOnLabel, preset.processedOnLabel);
       expect(restored.price, preset.price);
       expect(restored.rollDescription, preset.rollDescription);
@@ -60,6 +62,15 @@ void main() {
       final now = DateTime.now();
       expect(data.processedOnAt.difference(now).inMinutes.abs() < 1, isTrue);
       expect(data.bestIfUseByAt.isAfter(data.processedOnAt), isTrue);
+    });
+
+    test('applies the saved day count (3) to today, not a fixed default', () {
+      final preset = samplePreset();
+      final data = sushiLabelDataFromPreset(preset);
+
+      final nowAt = DateTime.now();
+      final today = DateTime(nowAt.year, nowAt.month, nowAt.day);
+      expect(data.bestIfUseByAt, today.add(const Duration(days: 3)));
     });
   });
 }

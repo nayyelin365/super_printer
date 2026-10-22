@@ -302,6 +302,16 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
   void updateSushiBestIfUseByAt(DateTime value) =>
       _updateSushi((d) => d.copyWith(bestIfUseByAt: value));
 
+  /// Sets Sell Through to [days] whole days from today's date (midnight —
+  /// no time component), e.g. typing `2` on Oct 22 sets Oct 24. Negative
+  /// input is ignored rather than producing a past date.
+  void updateSushiBestIfUseByDays(int days) {
+    if (days < 0) return;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    _updateSushi((d) => d.copyWith(bestIfUseByAt: today.add(Duration(days: days))));
+  }
+
   void updateSushiProcessedOnLabel(String value) =>
       _updateSushi((d) => d.copyWith(processedOnLabel: value));
 

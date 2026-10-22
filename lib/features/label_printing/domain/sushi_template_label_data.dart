@@ -23,7 +23,9 @@ class SushiTemplateLabelData extends LabelData {
     this.topDescription =
         'TOPPING: IMITATION CRAB SALAD, FRIED ONION, SPICY SAUCE, TEMPURA CRUNCH, JAPANESE CHILI POWDER MIXED, GREEN ONION',
     this.barcodeType = SushiBarcodeType.ean13,
-    this.barcodeValue = '4006381333931',
+    // 12-digit payload — the check digit is computed and appended
+    // automatically, never typed (see SushiBarcodeType.payloadLength).
+    this.barcodeValue = '400638133393',
   });
 
   static const String madeFreshDailyText = 'MADE FRESH DAILY';
@@ -50,8 +52,9 @@ class SushiTemplateLabelData extends LabelData {
 
   static SushiTemplateLabelData initial() {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     return SushiTemplateLabelData(
-      bestIfUseByAt: now.add(const Duration(hours: 24)),
+      bestIfUseByAt: today.add(const Duration(days: 1)),
       processedOnAt: now,
     );
   }

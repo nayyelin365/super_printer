@@ -7,9 +7,11 @@ const _uuid = Uuid();
 
 /// A named, reusable set of Sushi Template Label field values. Deliberately
 /// excludes the two live dates (Best If Use By / Processed On) — those
-/// always reset to "now" (+ offset) when a preset is loaded for a new
-/// print job, never a stale saved timestamp; see
-/// `SushiPresetController.toLabelData`.
+/// always reset relative to "now" when a preset is loaded for a new print
+/// job, never a stale saved absolute timestamp. [bestIfUseByDays] is the
+/// one exception: it's the number the user actually typed (days from
+/// today), not a date, so it's meaningful to save and reapply to whatever
+/// "today" is at load time; see `sushiLabelDataFromPreset`.
 class SushiLabelPreset {
   const SushiLabelPreset({
     required this.id,
@@ -18,6 +20,7 @@ class SushiLabelPreset {
     required this.fullyCookedText,
     required this.netWeightText,
     required this.bestIfUseByLabel,
+    required this.bestIfUseByDays,
     required this.processedOnLabel,
     required this.price,
     required this.rollDescription,
@@ -34,6 +37,7 @@ class SushiLabelPreset {
   final String fullyCookedText;
   final String netWeightText;
   final String bestIfUseByLabel;
+  final int bestIfUseByDays;
   final String processedOnLabel;
   final double price;
   final String rollDescription;
@@ -49,6 +53,7 @@ class SushiLabelPreset {
     String? fullyCookedText,
     String? netWeightText,
     String? bestIfUseByLabel,
+    int? bestIfUseByDays,
     String? processedOnLabel,
     double? price,
     String? rollDescription,
@@ -64,6 +69,7 @@ class SushiLabelPreset {
       fullyCookedText: fullyCookedText ?? this.fullyCookedText,
       netWeightText: netWeightText ?? this.netWeightText,
       bestIfUseByLabel: bestIfUseByLabel ?? this.bestIfUseByLabel,
+      bestIfUseByDays: bestIfUseByDays ?? this.bestIfUseByDays,
       processedOnLabel: processedOnLabel ?? this.processedOnLabel,
       price: price ?? this.price,
       rollDescription: rollDescription ?? this.rollDescription,
@@ -81,6 +87,7 @@ class SushiLabelPreset {
         'fullyCookedText': fullyCookedText,
         'netWeightText': netWeightText,
         'bestIfUseByLabel': bestIfUseByLabel,
+        'bestIfUseByDays': bestIfUseByDays,
         'processedOnLabel': processedOnLabel,
         'price': price,
         'rollDescription': rollDescription,
@@ -99,6 +106,7 @@ class SushiLabelPreset {
       fullyCookedText: json['fullyCookedText'] as String? ?? '',
       netWeightText: json['netWeightText'] as String? ?? '',
       bestIfUseByLabel: json['bestIfUseByLabel'] as String? ?? 'Sell Through',
+      bestIfUseByDays: json['bestIfUseByDays'] as int? ?? 1,
       processedOnLabel: json['processedOnLabel'] as String? ?? 'Processed On',
       price: (json['price'] as num?)?.toDouble() ?? 0,
       rollDescription: json['rollDescription'] as String? ?? '',
@@ -156,6 +164,7 @@ class SushiLabelPresetRepository {
       fullyCookedText: source.fullyCookedText,
       netWeightText: source.netWeightText,
       bestIfUseByLabel: source.bestIfUseByLabel,
+      bestIfUseByDays: source.bestIfUseByDays,
       processedOnLabel: source.processedOnLabel,
       price: source.price,
       rollDescription: source.rollDescription,
