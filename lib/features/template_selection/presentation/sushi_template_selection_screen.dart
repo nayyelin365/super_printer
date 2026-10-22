@@ -236,10 +236,19 @@ class _BarcodeTypeColumns extends StatelessWidget {
   static const _ean13Color = Color(0xFF1971C2); // Blue
   static const _upcAColor = Color(0xFF9C36B5); // Purple
 
+  static int _byName(SushiLabelPreset a, SushiLabelPreset b) =>
+      a.name.toLowerCase().compareTo(b.name.toLowerCase());
+
   @override
   Widget build(BuildContext context) {
-    final ean13 = presets.where((p) => p.barcodeType == SushiBarcodeType.ean13).toList();
-    final upcA = presets.where((p) => p.barcodeType == SushiBarcodeType.upcA).toList();
+    // Sorted A-Z within each column explicitly — not just relying on
+    // [SushiLabelPresetRepository.watchAll] already sorting the source
+    // list, so this column's order is guaranteed regardless of how the
+    // data arrived.
+    final ean13 = presets.where((p) => p.barcodeType == SushiBarcodeType.ean13).toList()
+      ..sort(_byName);
+    final upcA = presets.where((p) => p.barcodeType == SushiBarcodeType.upcA).toList()
+      ..sort(_byName);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
