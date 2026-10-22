@@ -7,6 +7,7 @@ import '../../label_printing/domain/custom_label_data.dart';
 import '../../label_printing/domain/food_rotation_label_data.dart';
 import '../../label_printing/domain/label_data.dart';
 import '../../label_printing/domain/label_template.dart';
+import '../../label_printing/domain/sushi_template_label_data.dart';
 import '../../label_printing/presentation/label_print_controller.dart';
 import '../../template_builder/presentation/template_builder_controller.dart';
 import '../../template_builder/presentation/template_repository_controller.dart';
@@ -44,6 +45,7 @@ class _TemplateSelectionScreenState extends ConsumerState<TemplateSelectionScree
           foodName: 'Imitation Crab Salad',
           employee: 'JS',
         ),
+      LabelTemplateType.sushiTemplate => SushiTemplateLabelData.initial(),
       LabelTemplateType.custom => CustomLabelData.initial(template),
     };
   }
@@ -52,7 +54,9 @@ class _TemplateSelectionScreenState extends ConsumerState<TemplateSelectionScree
     final template = _highlighted;
     ref.read(selectedLabelTemplateProvider.notifier).state = template;
 
-    if (template.requiresFoodSelection) {
+    if (template.type == LabelTemplateType.sushiTemplate) {
+      context.push('/sushi-template-selection');
+    } else if (template.requiresFoodSelection) {
       context.push('/food-selection');
     } else {
       ref.read(labelPrintControllerProvider.notifier).startNewLabel(template);

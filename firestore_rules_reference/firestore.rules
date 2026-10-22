@@ -41,6 +41,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Sushi Template Label (3 x 6 in) — saved presets, one doc per
+    // template, keyed by a generated id.
+    match /sushi_label_presets/{presetId} {
+      allow read, write: if true;
+    }
+
     // Custom names for the food list's color groups — one doc per color,
     // keyed by the color's ARGB int.
     match /food_group_names/{colorValue} {

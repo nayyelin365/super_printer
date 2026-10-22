@@ -26,9 +26,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Choose Label Template'), findsOneWidget);
 
-    // Only the two built-ins exist initially.
+    // Only the built-ins exist initially.
     expect(find.text('Custom Poke Bowl / Burrito'), findsOneWidget);
     expect(find.text('Food Rotation Label'), findsOneWidget);
+    expect(find.text('Sushi Template Label'), findsOneWidget);
     expect(find.text('My Kitchen Label'), findsNothing);
 
     // Create a new template.
@@ -55,7 +56,11 @@ void main() {
     expect(find.text('Custom'), findsOneWidget);
 
     // Select it and continue — it doesn't require food selection by
-    // default, so it should go straight to the print page.
+    // default, so it should go straight to the print page. Scrolled into
+    // view first: with a third built-in card now above it, it can start
+    // out below the fold.
+    await tester.ensureVisible(find.text('My Kitchen Label'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('My Kitchen Label'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FloatingActionButton, 'Continue'));

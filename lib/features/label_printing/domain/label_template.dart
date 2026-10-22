@@ -4,7 +4,7 @@ import 'label_component.dart';
 /// templates each get their own bespoke renderer/data class; every custom
 /// template — no matter how many a user creates — shares the single
 /// `custom` renderer/data path, driven entirely by [LabelTemplate.components].
-enum LabelTemplateType { pokeBowlBurrito, foodRotation, custom }
+enum LabelTemplateType { pokeBowlBurrito, foodRotation, sushiTemplate, custom }
 
 /// A label template: built-in (fixed layout, code-defined) or custom
 /// (user-defined, JSON-serializable, persisted locally). This is the one
@@ -132,5 +132,21 @@ class LabelTemplateCatalog {
     supportsBarcode: false,
   );
 
-  static const List<LabelTemplate> builtIns = [pokeBowlBurrito, foodRotation];
+  static const sushiTemplate = LabelTemplate(
+    id: 'builtin_sushi_template',
+    type: LabelTemplateType.sushiTemplate,
+    name: 'Sushi Template Label',
+    description: 'Sushi roll label (3 x 6 in)',
+    widthInches: 3,
+    heightInches: 6,
+    isBuiltIn: true,
+    requiresFoodSelection: false,
+    supportsBarcode: true,
+  );
+
+  static const List<LabelTemplate> builtIns = [
+    pokeBowlBurrito,
+    foodRotation,
+    sushiTemplate,
+  ];
 }

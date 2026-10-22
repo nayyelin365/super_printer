@@ -10,6 +10,7 @@ import 'widgets/food_rotation_fields_editor.dart';
 import 'widgets/label_preview.dart';
 import 'widgets/poke_bowl_fields_editor.dart';
 import 'widgets/print_details_panel.dart';
+import 'widgets/sushi_template_fields_editor.dart';
 
 class LabelPrintScreen extends StatelessWidget {
   const LabelPrintScreen({super.key});
@@ -106,6 +107,7 @@ class _PreviewColumn extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(labelPrintControllerProvider);
     final data = state.labelData;
+    final template = state.fullTemplate;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -131,7 +133,10 @@ class _PreviewColumn extends ConsumerWidget {
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 460),
-              child: LabelPreview(data: data),
+              child: LabelPreview(
+                data: data,
+                aspectRatio: template.widthInches / template.heightInches,
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -145,6 +150,7 @@ class _PreviewColumn extends ConsumerWidget {
           switch (state.template) {
             LabelTemplateType.pokeBowlBurrito => const PokeBowlFieldsEditor(),
             LabelTemplateType.foodRotation => const FoodRotationFieldsEditor(),
+            LabelTemplateType.sushiTemplate => const SushiTemplateFieldsEditor(),
             LabelTemplateType.custom => const CustomTemplateFieldsEditor(),
           },
         ],

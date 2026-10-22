@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/printer/label_printer.dart';
+import '../../../../core/printer/models/label_size.dart';
 import '../../../../core/printer/printer_session_controller.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/status_badge.dart';
@@ -11,6 +12,7 @@ import '../../domain/food_rotation_label_data.dart';
 import '../../domain/label_data.dart';
 import '../../domain/label_template.dart';
 import '../../domain/poke_bowl_pricing.dart';
+import '../../domain/sushi_template_label_data.dart';
 import '../label_print_controller.dart';
 import '../poke_bowl_pricing_controller.dart';
 import '../print_count_controller.dart';
@@ -25,6 +27,7 @@ class PrintDetailsPanel extends ConsumerWidget {
     final controller = ref.read(labelPrintControllerProvider.notifier);
     final pricing = ref.watch(pokeBowlPricingProvider);
     final printCount = ref.watch(printCountProvider);
+    final sushiPrintCount = ref.watch(sushiPrintCountProvider);
 
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
 
@@ -56,32 +59,9 @@ class PrintDetailsPanel extends ConsumerWidget {
                   tooltip: 'Save hours, employee & PH for this food',
                 ),
               if (state.labelData is PokeBowlLabelData)
-                Tooltip(
-                  message: 'Labels printed today',
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.today_outlined,
-                            size: 14, color: Colors.black54),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$printCount',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                _DailyPrintCountBadge(count: printCount),
+              if (state.labelData is SushiTemplateLabelData)
+                _DailyPrintCountBadge(count: sushiPrintCount),
               SizedBox(
                 width: 120,
                 child: ElevatedButton(
@@ -363,7 +343,11 @@ class PrintDetailsPanel extends ConsumerWidget {
           const SizedBox(height: 18),
 
           const _SectionLabel('LABEL SIZE'),
-          Text(session.config?.labelSize.displayName ?? '3 × 2"'),
+          Text(
+            state.template == LabelTemplateType.sushiTemplate
+                ? LabelSize.threeBySix.displayName
+                : session.config?.labelSize.displayName ?? '3 × 2"',
+          ),
           const SizedBox(height: 18),
 
           Center(
@@ -509,6 +493,43 @@ class _ExtraPriceButton extends StatelessWidget {
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+      ),
+    );
+  }
+}
+
+/// "Labels printed today" badge next to the Print button — shown per
+/// template (Poke Bowl, Sushi Template Label), each watching its own
+/// provider (see [printCountProvider]/[sushiPrintCountProvider]) so the
+/// number shown always matches the template currently on screen and
+/// resets at local midnight the same way for both.
+class _DailyPrintCountBadge extends StatelessWidget {
+  const _DailyPrintCountBadge({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Labels printed today',
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.today_outlined, size: 14, color: Colors.black54),
+            const SizedBox(width: 6),
+            Text(
+              '$count',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ],
+        ),
       ),
     );
   }

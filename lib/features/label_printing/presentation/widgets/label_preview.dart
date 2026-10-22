@@ -8,14 +8,19 @@ import '../../domain/label_template_renderer.dart';
 /// static image, and never a template-specific widget: adding a template
 /// only means adding it to the registry.
 class LabelPreview extends StatelessWidget {
-  const LabelPreview({super.key, required this.data});
+  const LabelPreview({super.key, required this.data, this.aspectRatio});
 
   final LabelData data;
+
+  /// Width / height of the template this [data] belongs to. Defaults to
+  /// the shared 3:2 design grid so every call site predating per-template
+  /// sizes keeps rendering exactly as before.
+  final double? aspectRatio;
 
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: LabelCanvas.designWidth / LabelCanvas.designHeight,
+      aspectRatio: aspectRatio ?? LabelCanvas.designWidth / LabelCanvas.designHeight,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: Colors.white,

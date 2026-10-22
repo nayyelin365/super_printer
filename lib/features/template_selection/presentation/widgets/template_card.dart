@@ -53,7 +53,10 @@ class TemplateCard extends StatelessWidget {
             children: [
               SizedBox(
                 width: 140,
-                child: LabelPreview(data: sampleData),
+                child: LabelPreview(
+                  data: sampleData,
+                  aspectRatio: template.widthInches / template.heightInches,
+                ),
               ),
               const SizedBox(height: 14),
               Row(

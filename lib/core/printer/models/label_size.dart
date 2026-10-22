@@ -11,8 +11,9 @@ class LabelSize {
   final double heightInches;
 
   static const threeByTwo = LabelSize('3x2', '3 × 2 inch', 3.0, 2.0);
+  static const threeBySix = LabelSize('3x6', '3 × 6 inch', 3.0, 6.0);
 
-  static const List<LabelSize> catalog = [threeByTwo];
+  static const List<LabelSize> catalog = [threeByTwo, threeBySix];
 
   static LabelSize fromId(String id) => catalog.firstWhere(
         (s) => s.id == id,

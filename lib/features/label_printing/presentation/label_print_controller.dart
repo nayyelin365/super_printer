@@ -13,8 +13,12 @@ import '../domain/label_component.dart';
 import '../domain/label_data.dart';
 import '../domain/label_template.dart';
 import '../domain/label_template_renderer.dart';
+import '../data/sushi_label_preset_repository.dart';
 import '../domain/poke_bowl_pricing.dart';
+import '../domain/sushi_barcode.dart';
+import '../domain/sushi_template_label_data.dart';
 import 'print_count_controller.dart';
+import 'sushi_preset_controller.dart';
 
 /// How the Use By date/time is decided.
 ///
@@ -39,6 +43,8 @@ class LabelPrintState {
     this.resultMessage,
     this.errorMessage,
     this.formGeneration = 0,
+    this.activeSushiPresetId,
+    this.activeSushiPresetName,
   }) : labelData = labelData ?? PokeBowlLabelData.initial();
 
   final LabelData labelData;
@@ -72,6 +78,13 @@ class LabelPrintState {
   /// resets cursor/focus.
   final int formGeneration;
 
+  /// Sushi template only: the saved preset the current fields were loaded
+  /// from/last saved to, if any — null means an unsaved/new label. Drives
+  /// whether "Save" in the fields editor updates that preset in place or
+  /// needs a name to create a new one.
+  final String? activeSushiPresetId;
+  final String? activeSushiPresetName;
+
   /// Which template [labelData] belongs to — derived from the data itself
   /// so the two can never drift out of sync.
   LabelTemplateType get template => labelData.templateType;
@@ -98,6 +111,8 @@ class LabelPrintState {
     String? Function()? resultMessage,
     String? Function()? errorMessage,
     int? formGeneration,
+    String? Function()? activeSushiPresetId,
+    String? Function()? activeSushiPresetName,
   }) {
     return LabelPrintState(
       labelData: labelData ?? this.labelData,
@@ -112,6 +127,10 @@ class LabelPrintState {
       resultMessage: resultMessage != null ? resultMessage() : this.resultMessage,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       formGeneration: formGeneration ?? this.formGeneration,
+      activeSushiPresetId:
+          activeSushiPresetId != null ? activeSushiPresetId() : this.activeSushiPresetId,
+      activeSushiPresetName:
+          activeSushiPresetName != null ? activeSushiPresetName() : this.activeSushiPresetName,
     );
   }
 }
@@ -263,6 +282,76 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     if (data is! FoodRotationLabelData) return;
     state = state.copyWith(
       labelData: data.copyWith(showPh: value),
+      resultMessage: () => null,
+    );
+  }
+
+  // ---- Sushi Template fields ---------------------------------------------
+
+  void updateSushiProductTitle(String value) => _updateSushi((d) => d.copyWith(productTitle: value));
+
+  void updateSushiFullyCookedText(String value) =>
+      _updateSushi((d) => d.copyWith(fullyCookedText: value));
+
+  void updateSushiNetWeightText(String value) =>
+      _updateSushi((d) => d.copyWith(netWeightText: value));
+
+  void updateSushiBestIfUseByLabel(String value) =>
+      _updateSushi((d) => d.copyWith(bestIfUseByLabel: value));
+
+  void updateSushiBestIfUseByAt(DateTime value) =>
+      _updateSushi((d) => d.copyWith(bestIfUseByAt: value));
+
+  void updateSushiProcessedOnLabel(String value) =>
+      _updateSushi((d) => d.copyWith(processedOnLabel: value));
+
+  void updateSushiProcessedOnAt(DateTime value) =>
+      _updateSushi((d) => d.copyWith(processedOnAt: value));
+
+  void updateSushiPrice(double value) => _updateSushi((d) => d.copyWith(price: value));
+
+  void updateSushiRollDescription(String value) =>
+      _updateSushi((d) => d.copyWith(rollDescription: value));
+
+  void updateSushiTopDescription(String value) =>
+      _updateSushi((d) => d.copyWith(topDescription: value));
+
+  void updateSushiBarcodeType(SushiBarcodeType value) =>
+      _updateSushi((d) => d.copyWith(barcodeType: value));
+
+  void updateSushiBarcodeValue(String value) =>
+      _updateSushi((d) => d.copyWith(barcodeValue: value));
+
+  void _updateSushi(SushiTemplateLabelData Function(SushiTemplateLabelData data) update) {
+    final data = state.labelData;
+    if (data is! SushiTemplateLabelData) return;
+    state = state.copyWith(labelData: update(data), resultMessage: () => null);
+  }
+
+  /// Starts a fresh Sushi Template Label — from [preset] if given (every
+  /// text/number/barcode field copied, but Best If Use By / Processed On
+  /// always reset to "now" rather than carrying over a stale saved
+  /// timestamp), or blank defaults otherwise. Always starts unbound from
+  /// any preset id/name — [bindSushiPreset] records that separately, once
+  /// the fields editor actually saves.
+  void startSushiLabel({SushiLabelPreset? preset}) {
+    state = LabelPrintState(
+      labelData:
+          preset == null ? SushiTemplateLabelData.initial() : sushiLabelDataFromPreset(preset),
+      formGeneration: state.formGeneration + 1,
+      activeSushiPresetId: preset?.id,
+      activeSushiPresetName: preset?.name,
+    );
+  }
+
+  /// Records which saved preset the current Sushi fields are now bound to
+  /// (or clears the binding with a null [id]) — called after the fields
+  /// editor creates/renames/copies a preset, so a later "Save" updates the
+  /// right document instead of creating a duplicate.
+  void bindSushiPreset({String? id, String? name}) {
+    state = state.copyWith(
+      activeSushiPresetId: () => id,
+      activeSushiPresetName: () => name,
       resultMessage: () => null,
     );
   }
@@ -424,6 +513,7 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
             showPh: ph.trim().isNotEmpty,
           );
         }(),
+      LabelTemplateType.sushiTemplate => SushiTemplateLabelData.initial(),
       LabelTemplateType.custom => () {
           final base = CustomLabelData.initial(template);
           return foodName == null
@@ -481,7 +571,12 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
 
     final config = session.config;
     final dpi = config?.dpi ?? 300;
-    final labelSize = config?.labelSize ?? LabelSize.threeByTwo;
+    // Sushi labels are always 3 x 6 in, regardless of the connected
+    // printer's configured label size — every other template keeps using
+    // the printer's own configured size, unchanged.
+    final labelSize = labelData.templateType == LabelTemplateType.sushiTemplate
+        ? LabelSize.threeBySix
+        : config?.labelSize ?? LabelSize.threeByTwo;
     final pixels = labelSize.pixelSize(dpi);
     final calibration = config?.calibration;
 
@@ -511,10 +606,13 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
         copies: state.quantity,
       );
 
-      // The "labels printed today" badge is only for the custom poke bowl
-      // label — don't count prints of any other template.
+      // The "labels printed today" badges are per-template (Poke Bowl and
+      // Sushi Template Label each keep their own running total) — don't
+      // count prints of any other template toward either one.
       if (state.labelData is PokeBowlLabelData) {
         await _ref.read(printCountProvider.notifier).increment(state.quantity);
+      } else if (state.labelData is SushiTemplateLabelData) {
+        await _ref.read(sushiPrintCountProvider.notifier).increment(state.quantity);
       }
 
       // Total Amount (base price + extras) is specific to this one sale —

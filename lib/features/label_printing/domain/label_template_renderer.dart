@@ -8,6 +8,7 @@ import 'generic_label_renderer.dart';
 import 'label_data.dart';
 import 'label_template.dart';
 import 'poke_bowl_label_renderer.dart';
+import 'sushi_template_label_renderer.dart';
 
 /// Physical label canvas, shared by every template. Both currently
 /// supported templates are 3 x 2 inches; the design grid is authored at
@@ -83,6 +84,7 @@ class LabelTemplateRenderers {
   static const Map<LabelTemplateType, LabelTemplateRenderer> _byType = {
     LabelTemplateType.pokeBowlBurrito: PokeBowlLabelRenderer(),
     LabelTemplateType.foodRotation: FoodRotationLabelRenderer(),
+    LabelTemplateType.sushiTemplate: SushiTemplateLabelRenderer(),
     LabelTemplateType.custom: GenericLabelRenderer(),
   };
 

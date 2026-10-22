@@ -24,6 +24,7 @@ import '../../features/receiving_log/presentation/add_receiving_item_screen.dart
 import '../../features/receiving_log/presentation/receiving_log_list_screen.dart';
 import '../../features/staff/presentation/staff_list_screen.dart';
 import '../../features/template_builder/presentation/template_builder_screen.dart';
+import '../../features/template_selection/presentation/sushi_template_selection_screen.dart';
 import '../../features/template_selection/presentation/template_selection_screen.dart';
 import '../widgets/app_shell.dart';
 
@@ -62,6 +63,10 @@ GoRouter createAppRouter() => GoRouter(
         GoRoute(
           path: '/food-selection',
           builder: (context, state) => const FoodSelectionScreen(),
+        ),
+        GoRoute(
+          path: '/sushi-template-selection',
+          builder: (context, state) => const SushiTemplateSelectionScreen(),
         ),
         GoRoute(path: '/print', builder: (context, state) => const LabelPrintScreen()),
         GoRoute(path: '/alarms', builder: (context, state) => const AlarmHomeScreen()),

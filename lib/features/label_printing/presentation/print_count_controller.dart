@@ -91,3 +91,15 @@ final printCountStorageProvider = Provider<PrintCountStorage>(
 final printCountProvider = StateNotifierProvider<PrintCountController, int>(
   (ref) => PrintCountController(ref.watch(printCountStorageProvider)),
 );
+
+/// Same daily-count behavior as [printCountProvider] (see
+/// [PrintCountController]'s doc for the midnight-reset mechanics), but a
+/// separate running total — kept under its own storage key — for the
+/// Sushi Template Label's own "labels printed today" badge.
+final sushiPrintCountStorageProvider = Provider<PrintCountStorage>(
+  (ref) => PrintCountStorage(key: 'daily_sushi_print_count'),
+);
+
+final sushiPrintCountProvider = StateNotifierProvider<PrintCountController, int>(
+  (ref) => PrintCountController(ref.watch(sushiPrintCountStorageProvider)),
+);

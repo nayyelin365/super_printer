@@ -53,7 +53,8 @@ void main() {
       final allTemplates = container.read(allTemplatesProvider);
       expect(allTemplates.map((t) => t.id), contains(LabelTemplateCatalog.pokeBowlBurrito.id));
       expect(allTemplates.map((t) => t.id), contains(LabelTemplateCatalog.foodRotation.id));
-      expect(allTemplates.where((t) => t.isBuiltIn), hasLength(2));
+      expect(allTemplates.map((t) => t.id), contains(LabelTemplateCatalog.sushiTemplate.id));
+      expect(allTemplates.where((t) => t.isBuiltIn), hasLength(LabelTemplateCatalog.builtIns.length));
       expect(allTemplates.where((t) => !t.isBuiltIn), hasLength(1));
     });
 
