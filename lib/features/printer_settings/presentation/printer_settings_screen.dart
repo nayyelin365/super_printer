@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/printer/models/connection_type.dart';
 import '../../../core/printer/models/label_size.dart';
+import '../../../core/printer/models/printer_config.dart';
+import '../../../core/printer/printer_session_controller.dart';
+import '../../../core/printer/saved_printers_controller.dart';
 import '../../../shared/theme/app_theme.dart';
 import 'printer_settings_controller.dart';
 import 'widgets/discovered_device_tile.dart';
@@ -79,6 +82,19 @@ class PrinterSettingsScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const _SavedPrintersList(),
+                      const SizedBox(height: 24),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      Text(
+                        state.isEditingExisting ? 'Edit Printer' : 'New Printer',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 16),
+
                       const _FieldLabel('Name'),
                       TextFormField(
                         initialValue: state.name,
@@ -256,6 +272,170 @@ class PrinterSettingsScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Every saved printer (across every label size), with Edit/Delete per
+/// row and an "Add New Printer" action — the entry point for actually
+/// having more than one saved printer, which nothing before this existed
+/// to support (saving always just overwrote the single active one).
+class _SavedPrintersList extends ConsumerWidget {
+  const _SavedPrintersList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final printers = ref.watch(savedPrintersProvider);
+    final activeId = ref.watch(printerSessionProvider).config?.id;
+    final controller = ref.read(printerSetupControllerProvider.notifier);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'SAVED PRINTERS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: Colors.black45,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => controller.editExisting(null),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add New Printer'),
+            ),
+          ],
+        ),
+        if (printers.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'No printers saved yet.',
+              style: TextStyle(fontSize: 12, color: Colors.black45),
+            ),
+          )
+        else
+          for (final printer in printers)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: _SavedPrinterTile(
+                printer: printer,
+                isActive: printer.id == activeId,
+                onEdit: () => controller.editExisting(printer),
+                onDelete: () => _confirmDelete(context, ref, printer),
+              ),
+            ),
+      ],
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, PrinterConfig printer) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Printer?'),
+          content: Text('Are you sure you want to delete "${printer.name}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+
+    await ref.read(printerSessionProvider.notifier).removeIfActive(printer.id);
+    await ref.read(savedPrintersProvider.notifier).delete(printer.id);
+  }
+}
+
+class _SavedPrinterTile extends StatelessWidget {
+  const _SavedPrinterTile({
+    required this.printer,
+    required this.isActive,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final PrinterConfig printer;
+  final bool isActive;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        border: Border.all(color: isActive ? AppTheme.amber : AppTheme.border, width: isActive ? 2 : 1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.print_outlined, size: 18, color: Colors.black45),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        printer.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isActive) ...[
+                      const SizedBox(width: 6),
+                      const Text(
+                        '• Active',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.success,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${printer.labelSize.displayName} · ${printer.dpi} DPI · ${printer.connectionType.label}',
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            tooltip: 'Edit',
+            visualDensity: VisualDensity.compact,
+          ),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline, size: 16),
+            tooltip: 'Delete',
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
       ),
     );
   }

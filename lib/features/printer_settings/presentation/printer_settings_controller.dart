@@ -10,8 +10,16 @@ import '../../../core/printer/models/printer_model.dart';
 import '../../../core/printer/printer_exceptions.dart';
 import '../../../core/printer/printer_registry.dart';
 import '../../../core/printer/printer_session_controller.dart';
+import '../../../core/printer/saved_printers_controller.dart';
 import '../../../core/printer/usb_label_printer.dart';
 import '../../../core/printer/zpl_encoder.dart';
+
+/// Which saved printer the settings screen's form is editing — null means
+/// "new printer" (the default when the screen is opened fresh). Set to a
+/// specific config when the user taps Edit on a row in the "Saved
+/// Printers" list, so Save updates that one in place instead of creating
+/// another.
+final editingPrinterConfigProvider = StateProvider<PrinterConfig?>((ref) => null);
 
 enum DeviceConnectState { idle, connecting, connected, failed }
 
@@ -104,9 +112,15 @@ class PrinterSetupState {
 
 class PrinterSetupController extends StateNotifier<PrinterSetupState> {
   factory PrinterSetupController(Ref ref, PrinterConfig? existing) {
-    if (existing == null) {
-      return PrinterSetupController._(ref, null, const PrinterSetupState());
-    }
+    return PrinterSetupController._(ref, existing, _stateFor(ref, existing));
+  }
+
+  /// Builds the form state for editing [existing] (seeded from its saved
+  /// fields) or, when null, a blank "new printer" form. Shared by the
+  /// factory (initial open) and [editExisting] (switching which saved
+  /// printer — or "new" — the already-open screen is editing).
+  static PrinterSetupState _stateFor(Ref ref, PrinterConfig? existing) {
+    if (existing == null) return const PrinterSetupState();
 
     // The printer's address is already known and persisted, so editing
     // metadata (name/DPI/label size) doesn't require a fresh connection.
@@ -116,21 +130,16 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
     final alreadyConnected = session.config?.id == existing.id &&
         session.status == PrinterConnectionStatus.connected;
 
-    return PrinterSetupController._(
-      ref,
-      existing,
-      PrinterSetupState(
-        name: existing.name,
-        connectionType: existing.connectionType,
-        printerModelId: existing.printerModelId,
-        dpi: existing.dpi,
-        labelSizeId: existing.labelSizeId,
-        selectedDevice: existing.toPrinterDevice(),
-        connectState: alreadyConnected
-            ? DeviceConnectState.connected
-            : DeviceConnectState.idle,
-        isEditingExisting: true,
-      ),
+    return PrinterSetupState(
+      name: existing.name,
+      connectionType: existing.connectionType,
+      printerModelId: existing.printerModelId,
+      dpi: existing.dpi,
+      labelSizeId: existing.labelSizeId,
+      selectedDevice: existing.toPrinterDevice(),
+      connectState:
+          alreadyConnected ? DeviceConnectState.connected : DeviceConnectState.idle,
+      isEditingExisting: true,
     );
   }
 
@@ -140,6 +149,20 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
     if (initial.connectState == DeviceConnectState.connected) {
       // Reuse the session's already-connected transport instead of opening
       // a second connection, so Test Print and Save act on the same link.
+      _pendingPrinter = _ref.read(printerSessionProvider.notifier).printer;
+      _reusingSessionPrinter = true;
+    }
+  }
+
+  /// Switches the form to edit [config] (or, when null, resets it to a
+  /// blank "new printer" form) — called from the Settings screen's "Saved
+  /// Printers" list (Edit row / "Add New Printer") without needing to
+  /// rebuild this whole controller.
+  void editExisting(PrinterConfig? config) {
+    _disposePendingPrinter();
+    _existingId = config?.id;
+    state = _stateFor(_ref, config);
+    if (state.connectState == DeviceConnectState.connected) {
       _pendingPrinter = _ref.read(printerSessionProvider.notifier).printer;
       _reusingSessionPrinter = true;
     }
@@ -318,6 +341,7 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
       // Editing metadata only; the live connection (if any) is untouched.
       await sessionNotifier.updateConfig(config);
     }
+    await _ref.read(savedPrintersProvider.notifier).reload();
 
     state = state.copyWith(isSaving: false, saved: true);
     return true;
@@ -332,11 +356,13 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
 
 final printerSetupControllerProvider = StateNotifierProvider.autoDispose<
     PrinterSetupController, PrinterSetupState>((ref) {
-  // Read (not watch): this should seed the form once from whatever printer
-  // is configured when the settings screen opens, not rebuild the whole
-  // controller — and discard in-progress edits — every time the session
-  // changes, which also happens as a side effect of save() itself.
-  final existing = ref.read(printerSessionProvider).config;
+  // Read (not watch): this should seed the form once from whichever saved
+  // printer [editingPrinterConfigProvider] names when the settings screen
+  // opens (or null for "add new"), not rebuild the whole controller every
+  // time that selection changes afterward — further switches go through
+  // [PrinterSetupController.editExisting] instead, called directly from
+  // the Saved Printers list's Edit/"Add New Printer" actions.
+  final existing = ref.read(editingPrinterConfigProvider);
   return PrinterSetupController(ref, existing);
 });
 

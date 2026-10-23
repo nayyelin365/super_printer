@@ -28,13 +28,13 @@ class PrinterSessionState {
   final String? errorMessage;
 
   PrinterSessionState copyWith({
-    PrinterConfig? config,
+    PrinterConfig? Function()? config,
     PrinterConnectionStatus? status,
     bool? isLoading,
     String? Function()? errorMessage,
   }) {
     return PrinterSessionState(
-      config: config ?? this.config,
+      config: config != null ? config() : this.config,
       status: status ?? this.status,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
@@ -60,7 +60,7 @@ class PrinterSessionController extends StateNotifier<PrinterSessionState> {
       state = state.copyWith(isLoading: false);
       return;
     }
-    state = state.copyWith(config: saved, isLoading: false);
+    state = state.copyWith(config: () => saved, isLoading: false);
     await reconnect();
   }
 
@@ -100,24 +100,73 @@ class PrinterSessionController extends StateNotifier<PrinterSessionState> {
     _printer = connectedPrinter;
     await _storage.save(config);
     state = state.copyWith(
-      config: config,
+      config: () => config,
       status: PrinterConnectionStatus.connected,
       errorMessage: () => null,
     );
   }
 
-  /// Persists edits to the saved printer's metadata (name, DPI, label size,
-  /// calibration, ...) without touching the live connection — used when the
-  /// user edits an already-connected (or currently offline) saved printer
-  /// rather than setting up a new device.
+  /// Persists edits to a saved printer's metadata (name, DPI, label size,
+  /// calibration, ...) — used when the user edits an already-saved printer
+  /// rather than setting up a new device. Only updates the *active*
+  /// session (and its live connection stays untouched either way) when
+  /// [config] is the one currently active; editing a different saved
+  /// printer's metadata must never silently make it the active one.
   Future<void> updateConfig(PrinterConfig config) async {
     await _storage.save(config);
-    state = state.copyWith(config: config, errorMessage: () => null);
+    if (state.config?.id == config.id) {
+      state = state.copyWith(config: () => config, errorMessage: () => null);
+    }
   }
 
   Future<void> disconnect() async {
     await _printer?.disconnect();
     state = state.copyWith(status: PrinterConnectionStatus.disconnected);
+  }
+
+  /// Makes [config] — an already-saved printer, picked from a list (e.g.
+  /// the print page's label-size-filtered picker) — the active one: opens
+  /// a real connection to it and re-saves it so it resumes as the active
+  /// printer on next app restart too. A no-op reconnect if it's already
+  /// the active, connected printer.
+  Future<void> selectPrinter(PrinterConfig config) async {
+    if (state.config?.id == config.id && state.status == PrinterConnectionStatus.connected) {
+      return;
+    }
+
+    state = state.copyWith(
+      config: () => config,
+      status: PrinterConnectionStatus.connecting,
+      errorMessage: () => null,
+    );
+
+    _printer?.dispose();
+    _printer = PrinterRegistry.create(config.connectionType);
+
+    try {
+      await _printer!
+          .connect(config.toPrinterDevice())
+          .timeout(const Duration(seconds: 10));
+      await _storage.save(config);
+      state = state.copyWith(status: PrinterConnectionStatus.connected);
+    } catch (e) {
+      state = state.copyWith(
+        status: PrinterConnectionStatus.disconnected,
+        errorMessage: () => _messageFor(e),
+      );
+    }
+  }
+
+  /// Clears the active session if it's currently pointed at [id] — called
+  /// right before that saved printer is deleted, so the app never keeps
+  /// printing through (or showing as connected) a config that no longer
+  /// exists in storage.
+  Future<void> removeIfActive(String id) async {
+    if (state.config?.id != id) return;
+    await disconnect();
+    _printer?.dispose();
+    _printer = null;
+    state = state.copyWith(config: () => null, status: PrinterConnectionStatus.disconnected);
   }
 
   Future<bool> isConnected() async => await _printer?.isConnected() ?? false;

@@ -89,6 +89,13 @@ class LabelPrintState {
   /// so the two can never drift out of sync.
   LabelTemplateType get template => labelData.templateType;
 
+  /// The physical label size this template always prints at — Sushi is
+  /// always 3 x 6 in, every other built-in/custom template is 3 x 2 in.
+  /// Drives both the printer picker (which saved printers are even
+  /// offered) and the actual print bitmap size in [LabelPrintController.print].
+  LabelSize get requiredLabelSize =>
+      template == LabelTemplateType.sushiTemplate ? LabelSize.threeBySix : LabelSize.threeByTwo;
+
   /// The full [LabelTemplate] behind [labelData]: for custom templates
   /// that's carried on the data itself; for built-ins it's looked up from
   /// the fixed catalog.
@@ -581,13 +588,11 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
 
     final config = session.config;
     final dpi = config?.dpi ?? 300;
-    // Sushi labels are always 3 x 6 in, regardless of the connected
-    // printer's configured label size — every other template keeps using
-    // the printer's own configured size, unchanged.
-    final labelSize = labelData.templateType == LabelTemplateType.sushiTemplate
-        ? LabelSize.threeBySix
-        : config?.labelSize ?? LabelSize.threeByTwo;
-    final pixels = labelSize.pixelSize(dpi);
+    // Always the template's own required size (the printer picker only
+    // ever offers saved printers configured for that size), not whatever
+    // the connected printer happens to report — keeps print() correct even
+    // if a printer's own labelSizeId were ever out of sync.
+    final pixels = state.requiredLabelSize.pixelSize(dpi);
     final calibration = config?.calibration;
 
     state = state.copyWith(

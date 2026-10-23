@@ -5,9 +5,13 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/printer/label_printer.dart';
 import '../../../../core/printer/models/label_size.dart';
+import '../../../../core/printer/models/printer_config.dart';
 import '../../../../core/printer/printer_session_controller.dart';
+import '../../../../core/printer/saved_printers_controller.dart';
 import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/status_badge.dart';
+import '../../../printer_settings/presentation/printer_settings_controller.dart'
+    show editingPrinterConfigProvider;
 import '../../domain/food_rotation_label_data.dart';
 import '../../domain/label_data.dart';
 import '../../domain/label_template.dart';
@@ -22,7 +26,6 @@ class PrintDetailsPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(printerSessionProvider);
     final state = ref.watch(labelPrintControllerProvider);
     final controller = ref.read(labelPrintControllerProvider.notifier);
     final pricing = ref.watch(pokeBowlPricingProvider);
@@ -308,46 +311,11 @@ class PrintDetailsPanel extends ConsumerWidget {
           const SizedBox(height: 18),
 
           const _SectionLabel('PRINTER'),
-          Row(
-            children: [
-              const Icon(Icons.print_outlined, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  session.config?.name ?? 'No printer configured',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              StatusBadge(status: session.status),
-              IconButton(
-                onPressed: () => context.push('/settings'),
-                icon: const Icon(Icons.edit_outlined, size: 16),
-                tooltip: session.config == null ? 'Set up printer' : 'Edit printer settings',
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                padding: EdgeInsets.zero,
-              ),
-            ],
-          ),
-          if (session.status != PrinterConnectionStatus.connected)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: TextButton(
-                onPressed: session.config == null
-                    ? null
-                    : () => ref.read(printerSessionProvider.notifier).reconnect(),
-                child: const Text('Reconnect'),
-              ),
-            ),
+          _PrinterPicker(requiredLabelSize: state.requiredLabelSize),
           const SizedBox(height: 18),
 
           const _SectionLabel('LABEL SIZE'),
-          Text(
-            state.template == LabelTemplateType.sushiTemplate
-                ? LabelSize.threeBySix.displayName
-                : session.config?.labelSize.displayName ?? '3 × 2"',
-          ),
+          Text(state.requiredLabelSize.displayName),
           const SizedBox(height: 18),
 
           Center(
@@ -503,6 +471,129 @@ class _ExtraPriceButton extends StatelessWidget {
 /// provider (see [printCountProvider]/[sushiPrintCountProvider]) so the
 /// number shown always matches the template currently on screen and
 /// resets at local midnight the same way for both.
+/// Dropdown of saved printers configured for [requiredLabelSize] — the
+/// active template's own physical size (3 x 6 for Sushi, 3 x 2 for every
+/// other template; see [LabelPrintState.requiredLabelSize]) — so a 3 x 2
+/// printer is never offered for a Sushi label and vice versa. The first
+/// matching printer is the default: if nothing matching is already the
+/// active session printer, this connects to that first match
+/// automatically rather than leaving the panel showing a printer that
+/// can't actually be printed to without an extra tap.
+class _PrinterPicker extends ConsumerStatefulWidget {
+  const _PrinterPicker({required this.requiredLabelSize});
+  final LabelSize requiredLabelSize;
+
+  @override
+  ConsumerState<_PrinterPicker> createState() => _PrinterPickerState();
+}
+
+class _PrinterPickerState extends ConsumerState<_PrinterPicker> {
+  /// The label size id this widget has already tried auto-selecting a
+  /// default printer for — guards against reconnecting on every rebuild
+  /// (e.g. while the user is actively typing other fields).
+  String? _autoSelectedForLabelSizeId;
+
+  @override
+  Widget build(BuildContext context) {
+    final allPrinters = ref.watch(savedPrintersProvider);
+    final session = ref.watch(printerSessionProvider);
+    final matches =
+        allPrinters.where((p) => p.labelSizeId == widget.requiredLabelSize.id).toList();
+
+    if (matches.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'No saved ${widget.requiredLabelSize.displayName} printer.',
+            style: const TextStyle(fontSize: 13, color: Colors.black54),
+          ),
+          Tooltip(
+            message: 'Set up printer',
+            child: TextButton(
+              onPressed: () => _openSettings(null),
+              child: const Text('Set up printer'),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final activeId = session.config?.id;
+    final activeMatches = matches.any((p) => p.id == activeId);
+    final selectedId = activeMatches ? activeId : matches.first.id;
+    final selected = matches.firstWhere((p) => p.id == selectedId);
+
+    if (!activeMatches && _autoSelectedForLabelSizeId != widget.requiredLabelSize.id) {
+      _autoSelectedForLabelSizeId = widget.requiredLabelSize.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(printerSessionProvider.notifier).selectPrinter(selected);
+      });
+    }
+
+    final selectedIsActive = selectedId == activeId;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.print_outlined, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: DropdownButton<String>(
+                value: selectedId,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                items: [
+                  for (final p in matches)
+                    DropdownMenuItem(
+                      value: p.id,
+                      child: Text(
+                        p.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (id) {
+                  if (id == null) return;
+                  final picked = matches.firstWhere((p) => p.id == id);
+                  ref.read(printerSessionProvider.notifier).selectPrinter(picked);
+                },
+              ),
+            ),
+            StatusBadge(
+              status: selectedIsActive ? session.status : PrinterConnectionStatus.disconnected,
+            ),
+            IconButton(
+              onPressed: () => _openSettings(selected),
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              tooltip: 'Manage printers',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              padding: EdgeInsets.zero,
+            ),
+          ],
+        ),
+        if (selectedIsActive && session.status != PrinterConnectionStatus.connected)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: TextButton(
+              onPressed: () => ref.read(printerSessionProvider.notifier).reconnect(),
+              child: const Text('Reconnect'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _openSettings(PrinterConfig? editing) {
+    ref.read(editingPrinterConfigProvider.notifier).state = editing;
+    context.push('/settings');
+  }
+}
+
 class _DailyPrintCountBadge extends StatelessWidget {
   const _DailyPrintCountBadge({required this.count});
   final int count;

@@ -27,8 +27,9 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
   static const _margin = 36.0;
   static const _boxWidth = 480.0;
   static const _boxPadding = 16.0;
-  static const _barcodeHeight = 180.0;
+  static const _barcodeHeight = 210.0;
   static const _barcodeWidth = 560.0;
+  static const _barcodeFontSize = 30.0;
 
   static final _dateFormat = DateFormat('MM/dd/yyyy');
 
@@ -281,7 +282,7 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
       width: _barcodeWidth,
       height: _barcodeHeight,
       drawText: true,
-      fontHeight: 18,
+      fontHeight: _barcodeFontSize,
     )) {
       switch (element) {
         case bc.BarcodeBar(:final black) when black:
@@ -311,7 +312,7 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
     final painter = TextPainter(
       text: TextSpan(
         text: element.text,
-        style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600),
+        style: const TextStyle(color: Colors.black, fontSize: _barcodeFontSize, fontWeight: FontWeight.w600),
       ),
       textDirection: ui.TextDirection.ltr,
       textAlign: textAlign,
