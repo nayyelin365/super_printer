@@ -324,6 +324,7 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
       usbVendorId: device.usbVendorId,
       usbProductId: device.usbProductId,
       usbDeviceName: device.usbDeviceName,
+      usbSerialNumber: device.usbSerialNumber,
       dpi: state.dpi,
       labelSizeId: state.labelSizeId,
     );

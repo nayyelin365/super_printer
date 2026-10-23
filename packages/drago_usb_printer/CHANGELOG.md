@@ -1,0 +1,51 @@
+## 0.0.1
+
+* first release
+
+## 0.0.3
+
+* Upgraded to Android gradle 7.2.2
+
+## 0.0.4
+
+* Fix kotlin version
+
+## 0.0.5
+
+* Flutter 3.10
+
+## 0.0.6
+
+* Write bytes by vendorid and productid
+
+## 0.0.7
+
+* Fix disconnect
+
+## 0.0.8
+
+* Fix disconnect
+
+## 0.0.9
+
+* Migrated to flutter >= 3.3.0
+
+## 0.1.0
+
+* Migrated to gradle > 8.0
+
+## 0.1.1
+
+* Fixed issue with <= android 11
+
+## 0.1.2
+
+* Fixed issue with >= android 14
+
+## 0.1.3
+
+* Improve usb print performance 
+
+## 0.1.4
+
+* Improve bulk usb print 

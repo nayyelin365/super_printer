@@ -43,6 +43,7 @@ class UsbLabelPrinter implements LabelPrinter {
         final productId = int.tryParse('${d['productId'] ?? ''}') ?? 0;
         final productName = (d['productName'] as String?) ?? '';
         final deviceName = (d['deviceName'] as String?) ?? '';
+        final serialNumber = (d['serialNumber'] as String?)?.trim();
         return PrinterDevice(
           name: productName.isNotEmpty ? productName : deviceName,
           address: '$vendorId:$productId',
@@ -50,6 +51,7 @@ class UsbLabelPrinter implements LabelPrinter {
           usbVendorId: vendorId,
           usbProductId: productId,
           usbDeviceName: deviceName,
+          usbSerialNumber: (serialNumber == null || serialNumber.isEmpty) ? null : serialNumber,
         );
       }).toList();
     } catch (e) {
@@ -83,7 +85,11 @@ class UsbLabelPrinter implements LabelPrinter {
     bool connected;
     try {
       connected = await _usbPrinter
-          .connect(printer.usbVendorId!, printer.usbProductId!)
+          .connect(
+            printer.usbVendorId!,
+            printer.usbProductId!,
+            serialNumber: printer.usbSerialNumber,
+          )
           .timeout(const Duration(seconds: 10), onTimeout: () => false) ??
           false;
     } catch (e) {

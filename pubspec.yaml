@@ -58,7 +58,14 @@ dependencies:
   # printer as a USB device by vendor/product id directly (not a generic
   # serial port with a baud rate), which is what actually works reliably
   # with Zebra USB printers in practice.
-  drago_usb_printer: ^0.1.4
+  #
+  # Vendored locally (packages/drago_usb_printer, forked from pub.dev
+  # 0.1.4) and patched to match/connect by USB serial number, not just
+  # vendor+product id — two printers of the same model share the same
+  # vendor/product id, so without this, the app can't reliably tell two
+  # identical-model printers apart or connect to a specific one of them.
+  drago_usb_printer:
+    path: packages/drago_usb_printer
 
   # Code 128 barcode generation, rendered at print resolution
   barcode: ^2.2.9

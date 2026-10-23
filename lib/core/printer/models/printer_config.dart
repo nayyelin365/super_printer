@@ -20,6 +20,7 @@ class PrinterConfig {
     this.usbVendorId,
     this.usbProductId,
     this.usbDeviceName,
+    this.usbSerialNumber,
     this.dpi = 300,
     this.labelSizeId = '3x2',
     this.isDefault = true,
@@ -35,6 +36,15 @@ class PrinterConfig {
   final int? usbVendorId;
   final int? usbProductId;
   final String? usbDeviceName;
+
+  /// The saved printer's USB serial number, when the device exposed one —
+  /// the one identifier that's actually unique per physical unit (unlike
+  /// [usbVendorId]/[usbProductId], identical across every printer of the
+  /// same model). Lets two saved configs for two identical-model printers
+  /// (e.g. one dedicated to 3x2 labels, one to 3x6) each reconnect to the
+  /// correct physical unit instead of whichever one Android happens to
+  /// enumerate first.
+  final String? usbSerialNumber;
 
   final int dpi;
   final String labelSizeId;
@@ -57,6 +67,7 @@ class PrinterConfig {
         usbVendorId: usbVendorId,
         usbProductId: usbProductId,
         usbDeviceName: usbDeviceName,
+        usbSerialNumber: usbSerialNumber,
       );
 
   PrinterConfig copyWith({
@@ -67,6 +78,7 @@ class PrinterConfig {
     int? usbVendorId,
     int? usbProductId,
     String? usbDeviceName,
+    String? usbSerialNumber,
     int? dpi,
     String? labelSizeId,
     bool? isDefault,
@@ -81,6 +93,7 @@ class PrinterConfig {
       usbVendorId: usbVendorId ?? this.usbVendorId,
       usbProductId: usbProductId ?? this.usbProductId,
       usbDeviceName: usbDeviceName ?? this.usbDeviceName,
+      usbSerialNumber: usbSerialNumber ?? this.usbSerialNumber,
       dpi: dpi ?? this.dpi,
       labelSizeId: labelSizeId ?? this.labelSizeId,
       isDefault: isDefault ?? this.isDefault,
@@ -97,6 +110,7 @@ class PrinterConfig {
         'usbVendorId': usbVendorId,
         'usbProductId': usbProductId,
         'usbDeviceName': usbDeviceName,
+        'usbSerialNumber': usbSerialNumber,
         'dpi': dpi,
         'labelSizeId': labelSizeId,
         'isDefault': isDefault,
@@ -115,6 +129,7 @@ class PrinterConfig {
       usbVendorId: json['usbVendorId'] as int?,
       usbProductId: json['usbProductId'] as int?,
       usbDeviceName: json['usbDeviceName'] as String?,
+      usbSerialNumber: json['usbSerialNumber'] as String?,
       dpi: json['dpi'] as int? ?? 300,
       labelSizeId: json['labelSizeId'] as String? ?? LabelSize.threeByTwo.id,
       isDefault: json['isDefault'] as bool? ?? true,
