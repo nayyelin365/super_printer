@@ -250,7 +250,7 @@ class _BarcodeTypeColumns extends StatelessWidget {
     final upcA = presets.where((p) => p.barcodeType == SushiBarcodeType.upcA).toList()
       ..sort(_byName);
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
