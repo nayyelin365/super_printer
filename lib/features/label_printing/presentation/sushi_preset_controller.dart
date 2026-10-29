@@ -79,6 +79,7 @@ class SushiPresetController extends StateNotifier<List<SushiLabelPreset>> {
         price: data.price,
         rollDescription: data.rollDescription,
         topDescription: data.topDescription,
+        ingredientsText: data.ingredientsText,
         barcodeType: data.barcodeType,
         barcodeValue: data.barcodeValue,
         createdAt: existing?.createdAt ?? DateTime.now(),
@@ -114,6 +115,7 @@ class SushiPresetController extends StateNotifier<List<SushiLabelPreset>> {
       price: data.price,
       rollDescription: data.rollDescription,
       topDescription: data.topDescription,
+      ingredientsText: data.ingredientsText,
       barcodeType: data.barcodeType,
       barcodeValue: data.barcodeValue,
       createdAt: now,
@@ -141,6 +143,7 @@ SushiTemplateLabelData sushiLabelDataFromPreset(SushiLabelPreset preset) {
     price: preset.price,
     rollDescription: preset.rollDescription,
     topDescription: preset.topDescription,
+    ingredientsText: preset.ingredientsText,
     barcodeType: preset.barcodeType,
     barcodeValue: preset.barcodeValue,
   );

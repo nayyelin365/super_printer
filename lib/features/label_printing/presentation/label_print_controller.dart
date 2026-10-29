@@ -333,6 +333,9 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
   void updateSushiTopDescription(String value) =>
       _updateSushi((d) => d.copyWith(topDescription: value));
 
+  void updateSushiIngredientsText(String value) =>
+      _updateSushi((d) => d.copyWith(ingredientsText: value));
+
   void updateSushiBarcodeType(SushiBarcodeType value) =>
       _updateSushi((d) => d.copyWith(barcodeType: value));
 

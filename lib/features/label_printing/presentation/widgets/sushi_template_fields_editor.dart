@@ -96,6 +96,15 @@ class SushiTemplateFieldsEditor extends ConsumerWidget {
           onChanged: controller.updateSushiTopDescription,
         ),
         const SizedBox(height: 12),
+        TextFormField(
+          key: ValueKey('sushi-ingredients-${state.formGeneration}'),
+          initialValue: data.ingredientsText,
+          minLines: 2,
+          maxLines: 6,
+          decoration: const InputDecoration(labelText: 'Ingredients'),
+          onChanged: controller.updateSushiIngredientsText,
+        ),
+        const SizedBox(height: 12),
 
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

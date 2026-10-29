@@ -18,6 +18,7 @@ void main() {
       price: 9.99,
       rollDescription: 'ROLL: IMITATION CRAB, AVOCADO, CUCUMBER.',
       topDescription: 'TOPPING: IMITATION CRAB SALAD.',
+      ingredientsText: 'INGREDIENTS: IMITATION CRAB, AVOCADO, CUCUMBER.',
       barcodeType: SushiBarcodeType.upcA,
       barcodeValue: '036000291452',
       createdAt: now,
@@ -40,6 +41,7 @@ void main() {
       expect(restored.price, preset.price);
       expect(restored.rollDescription, preset.rollDescription);
       expect(restored.topDescription, preset.topDescription);
+      expect(restored.ingredientsText, preset.ingredientsText);
       expect(restored.barcodeType, SushiBarcodeType.upcA);
       expect(restored.barcodeValue, preset.barcodeValue);
       expect(restored.createdAt, preset.createdAt);

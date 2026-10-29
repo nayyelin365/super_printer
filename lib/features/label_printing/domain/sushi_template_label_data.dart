@@ -22,6 +22,8 @@ class SushiTemplateLabelData extends LabelData {
         'ROLL: IMITATION CRAB, AVOCADO, CUCUMBER, ROASTED SEAWEED, SEASONED RICE, SESAME SEEDS.',
     this.topDescription =
         'TOPPING: IMITATION CRAB SALAD, FRIED ONION, SPICY SAUCE, TEMPURA CRUNCH, JAPANESE CHILI POWDER MIXED, GREEN ONION',
+    this.ingredientsText =
+        'INGREDIENTS: IMITATION CRAB, AVOCADO, CUCUMBER, ROASTED SEAWEED, SEASONED RICE, SESAME SEEDS, FRIED ONION, SPICY SAUCE, TEMPURA CRUNCH, JAPANESE CHILI POWDER, GREEN ONION.',
     this.barcodeType = SushiBarcodeType.ean13,
     // 12-digit payload — the check digit is computed and appended
     // automatically, never typed (see SushiBarcodeType.payloadLength).
@@ -44,6 +46,7 @@ class SushiTemplateLabelData extends LabelData {
   final double price;
   final String rollDescription;
   final String topDescription;
+  final String ingredientsText;
   final SushiBarcodeType barcodeType;
   final String barcodeValue;
 
@@ -70,6 +73,7 @@ class SushiTemplateLabelData extends LabelData {
     double? price,
     String? rollDescription,
     String? topDescription,
+    String? ingredientsText,
     SushiBarcodeType? barcodeType,
     String? barcodeValue,
   }) {
@@ -84,6 +88,7 @@ class SushiTemplateLabelData extends LabelData {
       price: price ?? this.price,
       rollDescription: rollDescription ?? this.rollDescription,
       topDescription: topDescription ?? this.topDescription,
+      ingredientsText: ingredientsText ?? this.ingredientsText,
       barcodeType: barcodeType ?? this.barcodeType,
       barcodeValue: barcodeValue ?? this.barcodeValue,
     );

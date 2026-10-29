@@ -25,6 +25,7 @@ class SushiLabelPreset {
     required this.price,
     required this.rollDescription,
     required this.topDescription,
+    required this.ingredientsText,
     required this.barcodeType,
     required this.barcodeValue,
     required this.createdAt,
@@ -42,6 +43,7 @@ class SushiLabelPreset {
   final double price;
   final String rollDescription;
   final String topDescription;
+  final String ingredientsText;
   final SushiBarcodeType barcodeType;
   final String barcodeValue;
   final DateTime createdAt;
@@ -58,6 +60,7 @@ class SushiLabelPreset {
     double? price,
     String? rollDescription,
     String? topDescription,
+    String? ingredientsText,
     SushiBarcodeType? barcodeType,
     String? barcodeValue,
     DateTime? updatedAt,
@@ -74,6 +77,7 @@ class SushiLabelPreset {
       price: price ?? this.price,
       rollDescription: rollDescription ?? this.rollDescription,
       topDescription: topDescription ?? this.topDescription,
+      ingredientsText: ingredientsText ?? this.ingredientsText,
       barcodeType: barcodeType ?? this.barcodeType,
       barcodeValue: barcodeValue ?? this.barcodeValue,
       createdAt: createdAt,
@@ -92,6 +96,7 @@ class SushiLabelPreset {
         'price': price,
         'rollDescription': rollDescription,
         'topDescription': topDescription,
+        'ingredientsText': ingredientsText,
         'barcodeType': barcodeType.name,
         'barcodeValue': barcodeValue,
         'createdAtMillis': createdAt.millisecondsSinceEpoch,
@@ -111,6 +116,7 @@ class SushiLabelPreset {
       price: (json['price'] as num?)?.toDouble() ?? 0,
       rollDescription: json['rollDescription'] as String? ?? '',
       topDescription: json['topDescription'] as String? ?? '',
+      ingredientsText: json['ingredientsText'] as String? ?? '',
       barcodeType: SushiBarcodeType.values.asNameMap()[json['barcodeType']] ??
           SushiBarcodeType.ean13,
       barcodeValue: json['barcodeValue'] as String? ?? '',
@@ -169,6 +175,7 @@ class SushiLabelPresetRepository {
       price: source.price,
       rollDescription: source.rollDescription,
       topDescription: source.topDescription,
+      ingredientsText: source.ingredientsText,
       barcodeType: source.barcodeType,
       barcodeValue: source.barcodeValue,
       createdAt: now,

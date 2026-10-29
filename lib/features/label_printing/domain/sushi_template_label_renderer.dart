@@ -143,13 +143,18 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
       ],
     );
     cursor += 10;
-    _drawText(
+    cursor = _drawText(
       canvas,
       SushiTemplateLabelData.eatSameDayText,
       centerX: _centerX,
       top: cursor,
       style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w600, fontSize: 22),
     );
+    cursor += 20;
+
+    // Same font size as the Sell Through date value (20px) — _drawWrapped's
+    // default style already matches, so no explicit style override needed.
+    _drawWrapped(canvas, data.ingredientsText, cursor);
 
     _paintBarcode(canvas, data);
   }
