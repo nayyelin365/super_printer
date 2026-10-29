@@ -4,12 +4,12 @@ import 'dart:typed_data';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
-import 'chunked_writer.dart';
 import 'label_printer.dart';
 import 'models/connection_type.dart';
 import 'models/printer_calibration.dart';
 import 'models/printer_device.dart';
 import 'printer_exceptions.dart';
+import 'tspl_encoder.dart';
 import 'zpl_encoder.dart';
 
 /// Classic Bluetooth (SPP) transport for Zebra printers, built on
@@ -22,7 +22,8 @@ import 'zpl_encoder.dart';
 /// how these printers are set up in practice (pair once via OS Bluetooth
 /// settings, then connect from the app by address).
 class BluetoothLabelPrinter implements LabelPrinter {
-  final ZplEncoder _encoder = const ZplEncoder();
+  final ZplEncoder _zplEncoder = const ZplEncoder();
+  final TsplEncoder _tsplEncoder = const TsplEncoder();
   bool _connected = false;
 
   @override
@@ -139,6 +140,9 @@ class BluetoothLabelPrinter implements LabelPrinter {
     Uint8List imageBytes, {
     required int width,
     required int height,
+    required double labelWidthInches,
+    required double labelHeightInches,
+    bool useTspl = false,
     PrinterCalibration calibration = const PrinterCalibration(),
     int copies = 1,
   }) async {
@@ -149,15 +153,25 @@ class BluetoothLabelPrinter implements LabelPrinter {
       );
     }
 
-    final zpl = _encoder.buildLabelZpl(
-      pixels: imageBytes,
-      width: width,
-      height: height,
-      calibration: calibration,
-      copies: copies,
-    );
+    final bytes = useTspl
+        ? _tsplEncoder.buildLabelTspl(
+            pixels: imageBytes,
+            width: width,
+            height: height,
+            labelWidthInches: labelWidthInches,
+            labelHeightInches: labelHeightInches,
+            calibration: calibration,
+            copies: copies,
+          )
+        : utf8.encode(_zplEncoder.buildLabelZpl(
+            pixels: imageBytes,
+            width: width,
+            height: height,
+            calibration: calibration,
+            copies: copies,
+          ));
 
-    await _write(zpl);
+    await _write(bytes);
   }
 
   Future<void> printRawZpl(String zpl) async {
@@ -167,27 +181,41 @@ class BluetoothLabelPrinter implements LabelPrinter {
         'Printer is not connected. Please connect a printer before printing.',
       );
     }
-    await _write(zpl);
+    await _write(utf8.encode(zpl));
   }
 
-  Future<void> _write(String zpl) async {
-    try {
-      await ChunkedWriter.write(
-        utf8.encode(zpl),
-        (chunk) async {
-          // print_bluetooth_thermal's platform channel expects a growable
-          // List<int>, not a Uint8List/typed-data view.
-          final sent = await PrintBluetoothThermal.writeBytes(chunk.toList());
-          if (!sent) {
-            throw const PrinterException(
-              PrinterErrorCode.communicationError,
-              'Failed to send label data to the printer.',
-            );
-          }
-        },
-        chunkSize: 512,
-        delayMs: 20,
+  Future<void> printRawTspl(List<int> tspl) async {
+    if (!await isConnected()) {
+      throw const PrinterException(
+        PrinterErrorCode.notConnected,
+        'Printer is not connected. Please connect a printer before printing.',
       );
+    }
+    await _write(tspl);
+  }
+
+  Future<void> _write(List<int> data) async {
+    try {
+      // Deliberately NOT using ChunkedWriter here: print_bluetooth_thermal's
+      // native `writebytes` handler prepends a literal "\n" byte to every
+      // single call it receives (see its Android source), and itself
+      // already re-chunks into safe, flushed 16KB writes internally. If we
+      // also chunk on the Dart side, every chunk boundary injects an extra
+      // stray byte into the stream — invisible to ZPL (whitespace-tolerant
+      // ASCII hex) but fatal to TSPL's `BITMAP` command, whose binary
+      // payload must be exactly the declared byte count: a few stray bytes
+      // partway through desyncs the printer's parser and can print as a
+      // solid black block. Sending the whole job in one call means at most
+      // one spurious leading "\n" ever exists, landing before the first
+      // command line, which every TSPL/ZPL parser tolerates as harmless
+      // leading whitespace.
+      final sent = await PrintBluetoothThermal.writeBytes(data.toList());
+      if (!sent) {
+        throw const PrinterException(
+          PrinterErrorCode.communicationError,
+          'Failed to send label data to the printer.',
+        );
+      }
     } on PrinterException {
       rethrow;
     } catch (e) {

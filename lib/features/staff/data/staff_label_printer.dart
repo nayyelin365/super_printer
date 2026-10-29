@@ -60,6 +60,9 @@ Future<StaffLabelPrintResult> printStaffIdLabel(
       bitmap,
       width: pixels.width,
       height: pixels.height,
+      labelWidthInches: labelSize.widthInches,
+      labelHeightInches: labelSize.heightInches,
+      useTspl: config?.printerModel.isZebra == false,
       calibration: calibration,
     );
     return const StaffLabelPrintResult(success: true);

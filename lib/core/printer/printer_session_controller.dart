@@ -6,6 +6,7 @@ import 'label_printer.dart';
 import 'models/printer_config.dart';
 import 'printer_exceptions.dart';
 import 'printer_registry.dart';
+import 'tspl_encoder.dart';
 import 'usb_label_printer.dart';
 import 'zpl_encoder.dart';
 
@@ -48,7 +49,8 @@ class PrinterSessionController extends StateNotifier<PrinterSessionState> {
   }
 
   final PrinterStorage _storage;
-  final ZplEncoder _encoder = const ZplEncoder();
+  final ZplEncoder _zplEncoder = const ZplEncoder();
+  final TsplEncoder _tsplEncoder = const TsplEncoder();
   LabelPrinter? _printer;
 
   LabelPrinter? get printer => _printer;
@@ -181,17 +183,30 @@ class PrinterSessionController extends StateNotifier<PrinterSessionState> {
       );
     }
 
-    final zpl = _encoder.buildTestLabelZpl(
-      printerName: config.name,
-      labelSize: config.labelSize.displayName,
-      dpi: config.dpi,
-      connectionType: config.connectionType.label,
-    );
-
-    if (printer is BluetoothLabelPrinter) {
-      await printer.printRawZpl(zpl);
-    } else if (printer is UsbLabelPrinter) {
-      await printer.printRawZpl(zpl);
+    if (config.printerModel.isZebra) {
+      final zpl = _zplEncoder.buildTestLabelZpl(
+        printerName: config.name,
+        labelSize: config.labelSize.displayName,
+        dpi: config.dpi,
+        connectionType: config.connectionType.label,
+      );
+      if (printer is BluetoothLabelPrinter) {
+        await printer.printRawZpl(zpl);
+      } else if (printer is UsbLabelPrinter) {
+        await printer.printRawZpl(zpl);
+      }
+    } else {
+      final tspl = _tsplEncoder.buildTestLabelTspl(
+        printerName: config.name,
+        labelSize: config.labelSize.displayName,
+        dpi: config.dpi,
+        connectionType: config.connectionType.label,
+      );
+      if (printer is BluetoothLabelPrinter) {
+        await printer.printRawTspl(tspl);
+      } else if (printer is UsbLabelPrinter) {
+        await printer.printRawTspl(tspl);
+      }
     }
     return '1 test label printed successfully.';
   }

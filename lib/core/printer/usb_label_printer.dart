@@ -10,18 +10,21 @@ import 'models/connection_type.dart';
 import 'models/printer_calibration.dart';
 import 'models/printer_device.dart';
 import 'printer_exceptions.dart';
+import 'tspl_encoder.dart';
 import 'zpl_encoder.dart';
 
-/// USB transport for Zebra printers, built on `drago_usb_printer`.
+/// USB transport for Zebra *and* TSPL-speaking printers, built on
+/// `drago_usb_printer`.
 ///
 /// Talks to the printer directly by USB vendor/product id (as an Android
 /// `UsbDevice`), not as a generic serial port with a negotiated baud rate —
-/// this is what actually works reliably with Zebra USB printers, which
-/// don't behave like a standard USB-serial adapter. Android only; other
-/// desktop platforms would need a separate raw-USB or OS print-spooler
-/// adapter behind this same [LabelPrinter] interface.
+/// this is what actually works reliably with these printers, which don't
+/// behave like a standard USB-serial adapter. Android only; other desktop
+/// platforms would need a separate raw-USB or OS print-spooler adapter
+/// behind this same [LabelPrinter] interface.
 class UsbLabelPrinter implements LabelPrinter {
-  final ZplEncoder _encoder = const ZplEncoder();
+  final ZplEncoder _zplEncoder = const ZplEncoder();
+  final TsplEncoder _tsplEncoder = const TsplEncoder();
   final DragoUsbPrinter _usbPrinter = DragoUsbPrinter();
   bool _connected = false;
 
@@ -132,6 +135,9 @@ class UsbLabelPrinter implements LabelPrinter {
     Uint8List imageBytes, {
     required int width,
     required int height,
+    required double labelWidthInches,
+    required double labelHeightInches,
+    bool useTspl = false,
     PrinterCalibration calibration = const PrinterCalibration(),
     int copies = 1,
   }) async {
@@ -142,15 +148,25 @@ class UsbLabelPrinter implements LabelPrinter {
       );
     }
 
-    final zpl = _encoder.buildLabelZpl(
-      pixels: imageBytes,
-      width: width,
-      height: height,
-      calibration: calibration,
-      copies: copies,
-    );
+    final bytes = useTspl
+        ? _tsplEncoder.buildLabelTspl(
+            pixels: imageBytes,
+            width: width,
+            height: height,
+            labelWidthInches: labelWidthInches,
+            labelHeightInches: labelHeightInches,
+            calibration: calibration,
+            copies: copies,
+          )
+        : utf8.encode(_zplEncoder.buildLabelZpl(
+            pixels: imageBytes,
+            width: width,
+            height: height,
+            calibration: calibration,
+            copies: copies,
+          ));
 
-    await _write(zpl);
+    await _write(bytes);
   }
 
   Future<void> printRawZpl(String zpl) async {
@@ -160,16 +176,26 @@ class UsbLabelPrinter implements LabelPrinter {
         'Printer is not connected. Please connect a printer before printing.',
       );
     }
-    await _write(zpl);
+    await _write(utf8.encode(zpl));
   }
 
-  Future<void> _write(String zpl) async {
+  Future<void> printRawTspl(List<int> tspl) async {
+    if (!_connected) {
+      throw const PrinterException(
+        PrinterErrorCode.notConnected,
+        'Printer is not connected. Please connect a printer before printing.',
+      );
+    }
+    await _write(tspl);
+  }
+
+  Future<void> _write(List<int> data) async {
     try {
       // Let the connection settle before the first chunk goes out.
       await Future.delayed(const Duration(milliseconds: 200));
 
       await ChunkedWriter.write(
-        utf8.encode(zpl),
+        data,
         (chunk) async {
           final sent = await _usbPrinter.write(Uint8List.fromList(chunk));
           if (sent != true) {

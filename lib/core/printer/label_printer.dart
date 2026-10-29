@@ -22,16 +22,27 @@ abstract class LabelPrinter {
   Future<bool> isConnected();
 
   /// Renders [imageBytes] (a raw white/black bitmap, one byte per pixel,
-  /// 0 = white / 255 = black, row-major) as a Zebra-compatible graphic and
-  /// prints it at the printer's configured [PrinterCalibration].
+  /// 0 = white / 255 = black, row-major) as a printer-compatible graphic
+  /// and prints it at the printer's configured [PrinterCalibration].
   ///
-  /// [copies] labels are produced from this single transmitted image (via
-  /// the printer's own `^PQ` copy count) rather than re-sending the bitmap
+  /// Encodes as ZPL by default (Zebra printers); pass [useTspl] when the
+  /// saved printer is a non-Zebra model (`PrinterModel.isZebra == false`)
+  /// to encode as TSPL instead — the two speak genuinely different
+  /// command languages, not just different settings of the same one.
+  /// [labelWidthInches]/[labelHeightInches] (the label's physical size)
+  /// are only used for TSPL's `SIZE` command; ZPL works in dots only and
+  /// ignores them.
+  ///
+  /// [copies] labels are produced from this single transmitted image
+  /// (ZPL's `^PQ` / TSPL's `PRINT n,1`) rather than re-sending the bitmap
   /// once per copy.
   Future<void> printImage(
     Uint8List imageBytes, {
     required int width,
     required int height,
+    required double labelWidthInches,
+    required double labelHeightInches,
+    bool useTspl = false,
     PrinterCalibration calibration = const PrinterCalibration(),
     int copies = 1,
   });

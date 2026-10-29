@@ -12,6 +12,7 @@ import '../../../core/printer/printer_registry.dart';
 import '../../../core/printer/printer_session_controller.dart';
 import '../../../core/printer/saved_printers_controller.dart';
 import '../../../core/printer/usb_label_printer.dart';
+import '../../../core/printer/tspl_encoder.dart';
 import '../../../core/printer/zpl_encoder.dart';
 
 /// Which saved printer the settings screen's form is editing — null means
@@ -171,7 +172,8 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
   final Ref _ref;
   String? _existingId;
   LabelPrinter? _pendingPrinter;
-  final ZplEncoder _encoder = const ZplEncoder();
+  final ZplEncoder _zplEncoder = const ZplEncoder();
+  final TsplEncoder _tsplEncoder = const TsplEncoder();
 
   /// True while [_pendingPrinter] is actually the live session printer
   /// (reused, not opened by this screen) — it must never be disposed here.
@@ -263,26 +265,42 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
     }
 
     state = state.copyWith(isTestPrinting: true, testPrintMessage: () => null);
-    final zpl = _encoder.buildTestLabelZpl(
-      printerName: state.name.isEmpty
-          ? state.selectedDevice?.name ?? 'Printer'
-          : state.name,
-      labelSize: PrinterConfig(
-        id: '',
-        name: '',
-        connectionType: state.connectionType,
-        printerModelId: state.printerModelId,
-        labelSizeId: state.labelSizeId,
-      ).labelSize.displayName,
-      dpi: state.dpi,
-      connectionType: state.connectionType.label,
-    );
+    final printerName =
+        state.name.isEmpty ? state.selectedDevice?.name ?? 'Printer' : state.name;
+    final labelSizeName = PrinterConfig(
+      id: '',
+      name: '',
+      connectionType: state.connectionType,
+      printerModelId: state.printerModelId,
+      labelSizeId: state.labelSizeId,
+    ).labelSize.displayName;
+    final isZebra = PrinterModel.fromId(state.printerModelId).isZebra;
 
     try {
-      if (printer is BluetoothLabelPrinter) {
-        await printer.printRawZpl(zpl);
-      } else if (printer is UsbLabelPrinter) {
-        await printer.printRawZpl(zpl);
+      if (isZebra) {
+        final zpl = _zplEncoder.buildTestLabelZpl(
+          printerName: printerName,
+          labelSize: labelSizeName,
+          dpi: state.dpi,
+          connectionType: state.connectionType.label,
+        );
+        if (printer is BluetoothLabelPrinter) {
+          await printer.printRawZpl(zpl);
+        } else if (printer is UsbLabelPrinter) {
+          await printer.printRawZpl(zpl);
+        }
+      } else {
+        final tspl = _tsplEncoder.buildTestLabelTspl(
+          printerName: printerName,
+          labelSize: labelSizeName,
+          dpi: state.dpi,
+          connectionType: state.connectionType.label,
+        );
+        if (printer is BluetoothLabelPrinter) {
+          await printer.printRawTspl(tspl);
+        } else if (printer is UsbLabelPrinter) {
+          await printer.printRawTspl(tspl);
+        }
       }
       state = state.copyWith(
         isTestPrinting: false,

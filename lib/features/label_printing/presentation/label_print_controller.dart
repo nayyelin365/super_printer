@@ -615,11 +615,15 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
       );
 
       // One transmitted image, printed `quantity` times via the printer's
-      // own copy count (^PQ) — avoids re-sending the bitmap per copy.
+      // own copy count (ZPL ^PQ / TSPL PRINT n,1) — avoids re-sending the
+      // bitmap per copy.
       await printer.printImage(
         bitmap,
         width: pixels.width,
         height: pixels.height,
+        labelWidthInches: state.requiredLabelSize.widthInches,
+        labelHeightInches: state.requiredLabelSize.heightInches,
+        useTspl: config?.printerModel.isZebra == false,
         calibration: calibration ?? const PrinterCalibration(),
         copies: state.quantity,
       );
