@@ -101,10 +101,10 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
       width: rowBoxWidth,
       centerX: sellThroughCenterX,
       lines: [
-        (data.bestIfUseByLabel, const TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 24)),
+        (data.bestIfUseByLabel, const TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 28)),
         (
           _dateFormat.format(data.bestIfUseByAt),
-          const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 20)
+          const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 26)
         ),
       ],
     );
@@ -117,7 +117,7 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
       lines: [
         (
           '\$${data.price.toStringAsFixed(2)}',
-          const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 40)
+          const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 50)
         ),
       ],
     );
@@ -162,7 +162,9 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
   /// "READY TO EAT" and "FULLY COOKED" as bordered badges, with the net
   /// weight right-aligned on the same row.
   double _paintBadgeRow(Canvas canvas, SushiTemplateLabelData data, double top) {
-    const style = TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 22);
+    // "Ready To Eat" / "Contain Raw" (or whatever Fully Cooked Text is set
+    // to) badges.
+    const style = TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 24);
     const padding = 12.0;
 
     final readyWidth = _measureWidth(SushiTemplateLabelData.readyToEatText, style);
@@ -189,7 +191,7 @@ class SushiTemplateLabelRenderer extends LabelTemplateRenderer {
     );
 
     final netWeightStyle =
-        const TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 24);
+        const TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 26);
     final netWeightWidth = _measureWidth(data.netWeightText, netWeightStyle);
     _drawText(
       canvas,
