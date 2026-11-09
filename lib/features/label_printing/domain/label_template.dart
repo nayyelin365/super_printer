@@ -55,14 +55,16 @@ class LabelTemplate {
     String? description,
     List<LabelComponent>? components,
     bool? requiresFoodSelection,
+    double? widthInches,
+    double? heightInches,
   }) {
     return LabelTemplate(
       id: id,
       name: name ?? this.name,
       description: description ?? this.description,
       type: type,
-      widthInches: widthInches,
-      heightInches: heightInches,
+      widthInches: widthInches ?? this.widthInches,
+      heightInches: heightInches ?? this.heightInches,
       dpi: dpi,
       components: components ?? this.components,
       isBuiltIn: isBuiltIn,

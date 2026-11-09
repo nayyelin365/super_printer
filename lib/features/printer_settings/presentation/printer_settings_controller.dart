@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/printer/bluetooth_label_printer.dart';
 import '../../../core/printer/label_printer.dart';
 import '../../../core/printer/models/connection_type.dart';
+import '../../../core/printer/models/label_size.dart';
 import '../../../core/printer/models/printer_config.dart';
 import '../../../core/printer/models/printer_device.dart';
 import '../../../core/printer/models/printer_model.dart';
@@ -204,6 +205,16 @@ class PrinterSetupController extends StateNotifier<PrinterSetupState> {
   void setDpi(int dpi) => state = state.copyWith(dpi: dpi);
 
   void setLabelSize(String id) => state = state.copyWith(labelSizeId: id);
+
+  /// Dedicates this printer to a specific custom (Template Builder) label
+  /// size, e.g. 2 x 2 in — distinct from another printer dedicated to a
+  /// different custom size — by encoding the actual dimensions into
+  /// [PrinterSetupState.labelSizeId] via [LabelSize.sized] rather than the
+  /// flat [LabelSize.custom] placeholder.
+  void setCustomLabelSize(double widthInches, double heightInches) {
+    if (widthInches <= 0 || heightInches <= 0) return;
+    state = state.copyWith(labelSizeId: LabelSize.sized(widthInches, heightInches).id);
+  }
 
   Future<void> search() async {
     state = state.copyWith(

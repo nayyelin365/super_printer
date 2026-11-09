@@ -3,12 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/theme/app_theme.dart';
-import '../../label_printing/domain/custom_label_data.dart';
-import '../../label_printing/presentation/widgets/label_preview.dart';
 import 'template_builder_controller.dart';
 import 'widgets/component_list.dart';
 import 'widgets/component_palette.dart';
 import 'widgets/component_property_editor.dart';
+import 'widgets/interactive_label_canvas.dart';
 
 /// Visual editor for a custom template: add/position components on the
 /// left, see the exact same renderer used for printing on the right. Used
@@ -143,6 +142,13 @@ class _ComponentsPanel extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           const Text(
+            'CANVAS SIZE (INCHES)',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black45),
+          ),
+          const SizedBox(height: 6),
+          _CanvasSizeFields(state: state),
+          const SizedBox(height: 16),
+          const Text(
             'COMPONENTS',
             style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.black45),
           ),
@@ -169,29 +175,98 @@ class _PreviewPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final previewData = CustomLabelData.initial(state.template);
+    final aspectRatio = state.template.widthInches / state.template.heightInches;
 
     return Container(
       padding: const EdgeInsets.all(20),
-      alignment: Alignment.topCenter,
-      child: Column(
-        children: [
-          const Text(
-            'LABEL PREVIEW',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1,
-              color: Colors.black45,
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            const Text(
+              'LABEL PREVIEW — drag to move, drag the corner handle to resize',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+                color: Colors.black45,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: LabelPreview(data: previewData),
-          ),
-        ],
+            const SizedBox(height: 16),
+            // A tall/narrow custom canvas (e.g. 3 x 6 in) can be much taller
+            // than this panel's available height at a 460px width — cap by
+            // whichever dimension is actually the tighter constraint instead
+            // of always sizing from a fixed width, so it stays fully visible
+            // (and inside the SingleChildScrollView as a fallback) rather
+            // than overflowing vertically.
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const maxWidth = 460.0;
+                final maxHeight = MediaQuery.of(context).size.height * 0.6;
+                var width = maxWidth;
+                var height = width / aspectRatio;
+                if (height > maxHeight) {
+                  height = maxHeight;
+                  width = height * aspectRatio;
+                }
+                return SizedBox(
+                  width: width,
+                  height: height,
+                  child: InteractiveLabelCanvas(state: state),
+                );
+              },
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// Width/height (inches) inputs for the canvas itself — separate from a
+/// component's own X/Y/Width/Height in [ComponentPropertyEditor]. Changing
+/// these rescales every existing component proportionally (see
+/// [TemplateBuilderController.setCanvasSize]) rather than clipping them.
+class _CanvasSizeFields extends ConsumerWidget {
+  const _CanvasSizeFields({required this.state});
+  final TemplateBuilderState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(templateBuilderControllerProvider.notifier);
+
+    return Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            key: ValueKey('canvas-width-${state.template.id}'),
+            initialValue: state.template.widthInches.toStringAsFixed(1),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Width (in)', isDense: true),
+            onChanged: (text) {
+              final width = double.tryParse(text);
+              if (width != null && width > 0) {
+                controller.setCanvasSize(width, state.template.heightInches);
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextFormField(
+            key: ValueKey('canvas-height-${state.template.id}'),
+            initialValue: state.template.heightInches.toStringAsFixed(1),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Height (in)', isDense: true),
+            onChanged: (text) {
+              final height = double.tryParse(text);
+              if (height != null && height > 0) {
+                controller.setCanvasSize(state.template.widthInches, height);
+              }
+            },
+          ),
+        ),
+      ],
     );
   }
 }

@@ -11,10 +11,13 @@ class ComponentPalette extends ConsumerWidget {
   const ComponentPalette({super.key});
 
   static const _entries = [
-    (LabelComponentType.text, Icons.text_fields, 'Text'),
-    (LabelComponentType.barcode, Icons.qr_code_2, 'Barcode'),
-    (LabelComponentType.dateTime, Icons.calendar_today, 'Date/Time'),
-    (LabelComponentType.divider, Icons.horizontal_rule, 'Divider'),
+    (type: LabelComponentType.text, icon: Icons.text_fields, label: 'Text', vertical: false, filled: false),
+    (type: LabelComponentType.barcode, icon: Icons.qr_code_2, label: 'Barcode', vertical: false, filled: false),
+    (type: LabelComponentType.dateTime, icon: Icons.calendar_today, label: 'Date/Time', vertical: false, filled: false),
+    (type: LabelComponentType.divider, icon: Icons.horizontal_rule, label: 'Divider', vertical: false, filled: false),
+    (type: LabelComponentType.divider, icon: Icons.horizontal_rule, label: 'Vertical Divider', vertical: true, filled: false),
+    (type: LabelComponentType.box, icon: Icons.crop_square, label: 'Outline Box', vertical: false, filled: false),
+    (type: LabelComponentType.box, icon: Icons.square, label: 'Filled Box', vertical: false, filled: true),
   ];
 
   @override
@@ -27,9 +30,15 @@ class ComponentPalette extends ConsumerWidget {
       children: [
         for (final entry in _entries)
           OutlinedButton.icon(
-            onPressed: () => controller.addComponent(entry.$1),
-            icon: Icon(entry.$2, size: 16),
-            label: Text('+ ${entry.$3}'),
+            onPressed: () => controller.addComponent(
+              entry.type,
+              vertical: entry.vertical,
+              filled: entry.filled,
+            ),
+            icon: entry.vertical
+                ? RotatedBox(quarterTurns: 1, child: Icon(entry.icon, size: 16))
+                : Icon(entry.icon, size: 16),
+            label: Text('+ ${entry.label}'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppTheme.navyDark,
               side: const BorderSide(color: AppTheme.border),

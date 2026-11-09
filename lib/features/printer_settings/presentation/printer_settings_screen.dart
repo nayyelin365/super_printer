@@ -202,14 +202,33 @@ class PrinterSettingsScreen extends ConsumerWidget {
 
                       const _FieldLabel('Label Size'),
                       DropdownButtonFormField<String>(
-                        initialValue: state.labelSizeId,
+                        // The dropdown only ever offers the 3 catalog
+                        // entries, so a concrete 'custom:WxH' id (from
+                        // setCustomLabelSize) still needs to show as the
+                        // generic "Custom" option here — the actual
+                        // dimensions are edited via the fields below.
+                        initialValue:
+                            state.labelSizeId.startsWith('custom') ? 'custom' : state.labelSizeId,
                         items: LabelSize.catalog
                             .map((s) => DropdownMenuItem(value: s.id, child: Text(s.displayName)))
                             .toList(),
                         onChanged: (v) {
-                          if (v != null) controller.setLabelSize(v);
+                          if (v == null) return;
+                          if (v == 'custom') {
+                            final current = LabelSize.fromId(state.labelSizeId);
+                            controller.setCustomLabelSize(
+                              current.widthInches,
+                              current.heightInches,
+                            );
+                          } else {
+                            controller.setLabelSize(v);
+                          }
                         },
                       ),
+                      if (state.labelSizeId.startsWith('custom')) ...[
+                        const SizedBox(height: 10),
+                        _CustomLabelSizeFields(state: state, controller: controller),
+                      ],
                       const SizedBox(height: 20),
 
                       if (state.testPrintMessage != null)
@@ -437,6 +456,61 @@ class _SavedPrinterTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Width/height (inches) inputs shown under the Label Size dropdown when
+/// "Custom (set per template)" is selected — dedicates this printer to
+/// that specific size (see [PrinterSetupController.setCustomLabelSize]),
+/// distinct from another printer dedicated to a different custom size.
+class _CustomLabelSizeFields extends StatelessWidget {
+  const _CustomLabelSizeFields({required this.state, required this.controller});
+
+  final PrinterSetupState state;
+  final PrinterSetupController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = LabelSize.fromId(state.labelSizeId);
+
+    return Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            // Fixed keys (not derived from the live labelSizeId, which
+            // changes on every keystroke via setCustomLabelSize) — this
+            // screen/controller is recreated fresh per printer being
+            // edited, so there's no risk of showing stale text for a
+            // different printer.
+            key: const ValueKey('printer-custom-width'),
+            initialValue: current.widthInches.toStringAsFixed(1),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Width (in)', isDense: true),
+            onChanged: (text) {
+              final width = double.tryParse(text);
+              if (width != null && width > 0) {
+                controller.setCustomLabelSize(width, current.heightInches);
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextFormField(
+            key: const ValueKey('printer-custom-height'),
+            initialValue: current.heightInches.toStringAsFixed(1),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Height (in)', isDense: true),
+            onChanged: (text) {
+              final height = double.tryParse(text);
+              if (height != null && height > 0) {
+                controller.setCustomLabelSize(current.widthInches, height);
+              }
+            },
+          ),
+        ),
+      ],
     );
   }
 }

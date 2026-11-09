@@ -93,8 +93,14 @@ class LabelPrintState {
   /// always 3 x 6 in, every other built-in/custom template is 3 x 2 in.
   /// Drives both the printer picker (which saved printers are even
   /// offered) and the actual print bitmap size in [LabelPrintController.print].
-  LabelSize get requiredLabelSize =>
-      template == LabelTemplateType.sushiTemplate ? LabelSize.threeBySix : LabelSize.threeByTwo;
+  LabelSize get requiredLabelSize {
+    if (template == LabelTemplateType.sushiTemplate) return LabelSize.threeBySix;
+    if (template == LabelTemplateType.custom) {
+      final t = fullTemplate;
+      return LabelSize.sized(t.widthInches, t.heightInches);
+    }
+    return LabelSize.threeByTwo;
+  }
 
   /// The full [LabelTemplate] behind [labelData]: for custom templates
   /// that's carried on the data itself; for built-ins it's looked up from

@@ -63,7 +63,9 @@ class ComponentPropertyEditor extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
         ],
-        if (component.fieldKey == null && component.type != LabelComponentType.divider) ...[
+        if (component.fieldKey == null &&
+            component.type != LabelComponentType.divider &&
+            component.type != LabelComponentType.box) ...[
           const _Label('Text'),
           TextFormField(
             key: ValueKey('value-${component.id}'),
@@ -74,12 +76,44 @@ class ComponentPropertyEditor extends ConsumerWidget {
           const SizedBox(height: 12),
         ],
         if (component.type == LabelComponentType.barcode) ...[
+          const _Label('Symbology'),
+          DropdownButtonFormField<BarcodeSymbology>(
+            key: ValueKey('symbology-${component.id}'),
+            initialValue: component.barcodeSymbology,
+            items: [
+              for (final symbology in BarcodeSymbology.values)
+                DropdownMenuItem(value: symbology, child: Text(symbology.label)),
+            ],
+            onChanged: (value) {
+              if (value != null) update((c) => c.copyWith(barcodeSymbology: value));
+            },
+          ),
+          const SizedBox(height: 12),
           const _Label('Sample / Default Value'),
           TextFormField(
             key: ValueKey('barcodevalue-${component.id}'),
             initialValue: component.value ?? '',
-            decoration: const InputDecoration(hintText: 'Preview value, e.g. 0123456789'),
+            decoration: InputDecoration(
+              hintText: component.barcodeSymbology.isRetail
+                  ? '${component.barcodeSymbology.payloadLength} digits — check digit added automatically'
+                  : 'Preview value, e.g. 0123456789',
+            ),
             onChanged: (value) => update((c) => c.copyWith(value: value)),
+          ),
+          Builder(builder: (context) {
+            final error = component.barcodeSymbology.validate(component.value ?? '');
+            if (error == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(error, style: const TextStyle(color: Colors.red, fontSize: 11)),
+            );
+          }),
+          const SizedBox(height: 12),
+          _NumberField(
+            fieldId: '${component.id}-barcodeFontSize',
+            label: 'Number Font Size',
+            value: component.fontSize,
+            onChanged: (v) => update((c) => c.copyWith(fontSize: v)),
           ),
           const SizedBox(height: 12),
         ],
@@ -108,6 +142,23 @@ class ComponentPropertyEditor extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Text('White Text', style: TextStyle(fontSize: 13)),
+              Switch(
+                value: component.whiteText,
+                onChanged: (v) => update((c) => c.copyWith(whiteText: v)),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'For text on top of a filled box',
+                  style: TextStyle(fontSize: 11, color: Colors.black45),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           const _Label('Alignment'),
           DropdownButtonFormField<TextAlign>(
@@ -121,6 +172,29 @@ class ComponentPropertyEditor extends ConsumerWidget {
             onChanged: (value) {
               if (value != null) update((c) => c.copyWith(alignment: value));
             },
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (component.type == LabelComponentType.box) ...[
+          Row(
+            children: [
+              const Text('Filled', style: TextStyle(fontSize: 13)),
+              Switch(
+                value: component.filled,
+                onChanged: (v) => update((c) => c.copyWith(filled: v)),
+              ),
+              if (!component.filled) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _NumberField(
+                    fieldId: '${component.id}-boxThickness',
+                    label: 'Border Thickness',
+                    value: component.thickness,
+                    onChanged: (v) => update((c) => c.copyWith(thickness: v)),
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 12),
         ],
@@ -146,31 +220,62 @@ class ComponentPropertyEditor extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _NumberField(
-                fieldId: '${component.id}-width',
-                label: 'Width',
-                value: component.width,
-                onChanged: (v) => update((c) => c.copyWith(width: v)),
+        if (component.type == LabelComponentType.divider) ...[
+          Row(
+            children: [
+              const Text('Vertical', style: TextStyle(fontSize: 13)),
+              Switch(
+                value: component.vertical,
+                onChanged: (v) => update((c) => c.copyWith(vertical: v)),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _NumberField(
-                fieldId: '${component.id}-height',
-                label: component.type == LabelComponentType.divider ? 'Thickness' : 'Height',
-                value: component.type == LabelComponentType.divider
-                    ? component.thickness
-                    : component.height,
-                onChanged: (v) => component.type == LabelComponentType.divider
-                    ? update((c) => c.copyWith(thickness: v))
-                    : update((c) => c.copyWith(height: v)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _NumberField(
+                  fieldId: '${component.id}-length',
+                  label: 'Length',
+                  value: component.vertical ? component.height : component.width,
+                  onChanged: (v) => update(
+                    (c) => c.vertical ? c.copyWith(height: v) : c.copyWith(width: v),
+                  ),
+                ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _NumberField(
+                  fieldId: '${component.id}-thickness',
+                  label: 'Thickness',
+                  value: component.thickness,
+                  onChanged: (v) => update((c) => c.copyWith(thickness: v)),
+                ),
+              ),
+            ],
+          ),
+        ] else
+          Row(
+            children: [
+              Expanded(
+                child: _NumberField(
+                  fieldId: '${component.id}-width',
+                  label: 'Width',
+                  value: component.width,
+                  onChanged: (v) => update((c) => c.copyWith(width: v)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _NumberField(
+                  fieldId: '${component.id}-height',
+                  label: 'Height',
+                  value: component.height,
+                  onChanged: (v) => update((c) => c.copyWith(height: v)),
+                ),
+              ),
+            ],
+          ),
         const SizedBox(height: 12),
         Row(
           children: [

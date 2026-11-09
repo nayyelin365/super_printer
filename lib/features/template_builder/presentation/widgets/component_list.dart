@@ -47,7 +47,9 @@ class ComponentList extends ConsumerWidget {
                   : Colors.white,
               child: ListTile(
                 dense: true,
-                leading: Icon(_iconFor(component.type), size: 18),
+                leading: component.type == LabelComponentType.divider && component.vertical
+                    ? RotatedBox(quarterTurns: 1, child: Icon(_iconFor(component), size: 18))
+                    : Icon(_iconFor(component), size: 18),
                 title: Text(
                   _labelFor(component),
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -66,16 +68,26 @@ class ComponentList extends ConsumerWidget {
     );
   }
 
-  IconData _iconFor(LabelComponentType type) => switch (type) {
+  IconData _iconFor(LabelComponent component) => switch (component.type) {
         LabelComponentType.text => Icons.text_fields,
-        LabelComponentType.barcode => Icons.qr_code_2,
+        LabelComponentType.barcode =>
+          component.barcodeSymbology == BarcodeSymbology.qrCode ? Icons.qr_code : Icons.qr_code_2,
         LabelComponentType.dateTime => Icons.calendar_today,
         LabelComponentType.divider => Icons.horizontal_rule,
         LabelComponentType.image => Icons.image_outlined,
+        LabelComponentType.box => component.filled ? Icons.square : Icons.crop_square,
       };
 
   String _labelFor(LabelComponent component) {
-    if (component.type == LabelComponentType.divider) return 'Divider';
+    if (component.type == LabelComponentType.divider) {
+      return component.vertical ? 'Vertical Divider' : 'Divider';
+    }
+    if (component.type == LabelComponentType.barcode) {
+      return component.barcodeSymbology.label;
+    }
+    if (component.type == LabelComponentType.box) {
+      return component.filled ? 'Filled Box' : 'Outline Box';
+    }
     if (component.fieldKey != null) return LabelFieldKey.label(component.fieldKey!);
     return component.value?.isNotEmpty == true ? component.value! : 'Untitled';
   }
