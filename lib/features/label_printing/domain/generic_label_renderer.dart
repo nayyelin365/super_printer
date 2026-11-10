@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:barcode/barcode.dart' as bc;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'custom_label_data.dart';
 import 'label_component.dart';
@@ -73,14 +75,23 @@ class GenericLabelRenderer extends LabelTemplateRenderer {
   }
 
   void _paintText(Canvas canvas, LabelComponent component, String text) {
+    final baseStyle = TextStyle(
+      color: component.whiteText ? Colors.white : Colors.black,
+      fontSize: component.fontSize,
+      fontWeight: component.bold ? FontWeight.w700 : FontWeight.w400,
+      fontStyle: component.italic ? FontStyle.italic : FontStyle.normal,
+    );
+    // GoogleFonts.getFont fetches/caches the font's files on first use and
+    // falls back to the platform default (never throws) if that fails —
+    // see the family picker's note in `LabelFontFamily`.
+    final style = component.fontFamily == null
+        ? baseStyle
+        : GoogleFonts.getFont(component.fontFamily!, textStyle: baseStyle);
+
     final painter = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(
-          color: component.whiteText ? Colors.white : Colors.black,
-          fontSize: component.fontSize,
-          fontWeight: component.bold ? FontWeight.w700 : FontWeight.w400,
-        ),
+        style: style,
       ),
       textDirection: ui.TextDirection.ltr,
       textAlign: component.alignment,
@@ -94,7 +105,25 @@ class GenericLabelRenderer extends LabelTemplateRenderer {
     } else if (component.alignment == TextAlign.right) {
       dx = component.x + component.width - painter.width;
     }
+
+    if (component.rotationDegrees == 0) {
+      painter.paint(canvas, Offset(dx, component.y));
+      return;
+    }
+
+    // Rotate around the component box's own center, matching how a design
+    // tool rotates a text box in place rather than around the canvas
+    // origin.
+    final center = Offset(
+      component.x + component.width / 2,
+      component.y + component.height / 2,
+    );
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(component.rotationDegrees * math.pi / 180);
+    canvas.translate(-center.dx, -center.dy);
     painter.paint(canvas, Offset(dx, component.y));
+    canvas.restore();
   }
 
   /// Matches the Sushi Template Label's barcode rendering: bars plus the
@@ -168,14 +197,17 @@ class GenericLabelRenderer extends LabelTemplateRenderer {
   /// inside it is a separate component positioned on top.
   void _paintBox(Canvas canvas, LabelComponent component) {
     final rect = Rect.fromLTWH(component.x, component.y, component.width, component.height);
-    canvas.drawRect(
-      rect,
-      component.filled
-          ? (Paint()..color = Colors.black)
-          : (Paint()
-            ..color = Colors.black
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = component.thickness),
-    );
+    final paint = component.filled
+        ? (Paint()..color = Colors.black)
+        : (Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = component.thickness);
+
+    if (component.boxShape == LabelBoxShape.oval) {
+      canvas.drawOval(rect, paint);
+    } else {
+      canvas.drawRect(rect, paint);
+    }
   }
 }

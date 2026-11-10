@@ -7,6 +7,63 @@ import 'package:flutter/material.dart';
 /// editor — nothing else needs to change.
 enum LabelComponentType { text, barcode, dateTime, divider, image, box }
 
+/// `box` components only: the outline/fill shape to draw.
+enum LabelBoxShape { rectangle, oval }
+
+/// `text`/`dateTime` components only: a curated list of Google Fonts
+/// offered in the font family picker — not every Google Font, just a small
+/// set covering the common style categories (sans, serif, mono, display,
+/// script), since the full catalog has thousands of entries. A component's
+/// `fontFamily` isn't restricted to this list (it's just a string name
+/// passed to `GoogleFonts.getFont`), but this is what the UI shows.
+class LabelFontFamily {
+  const LabelFontFamily._();
+
+  /// Null/absent in [LabelComponent.fontFamily] means the platform default
+  /// font, not a Google Font — this is the dropdown's label for that.
+  static const defaultLabel = 'Default';
+
+  static const List<String> options = [
+    // Sans-serif
+    'Roboto',
+    'Open Sans',
+    'Lato',
+    'Montserrat',
+    'Poppins',
+    'Nunito',
+    'Raleway',
+    'Ubuntu',
+    'Inter',
+    'Rubik',
+    'Work Sans',
+    'Fira Sans',
+    'Barlow',
+    'Quicksand',
+    'Noto Sans',
+    // Serif
+    'Playfair Display',
+    'Merriweather',
+    'Lora',
+    'Libre Baskerville',
+    'Crimson Text',
+    // Monospace
+    'Roboto Mono',
+    'JetBrains Mono',
+    'Space Mono',
+    // Display / script / handwriting
+    'Oswald',
+    'Bebas Neue',
+    'Anton',
+    'Abril Fatface',
+    'Caveat',
+    'Pacifico',
+    'Dancing Script',
+    'Indie Flower',
+    'Permanent Marker',
+    'Shadows Into Light',
+  ];
+}
+
 /// `barcode` components only: which symbology to render the value as.
 /// [ean13]/[upcA] mirror the Sushi Template Label's retail-barcode handling
 /// (see `sushi_barcode.dart`'s `SushiBarcodeType`) — the user types only the
@@ -142,6 +199,10 @@ class LabelComponent {
     this.barcodeSymbology = BarcodeSymbology.code128,
     this.filled = false,
     this.whiteText = false,
+    this.italic = false,
+    this.rotationDegrees = 0,
+    this.boxShape = LabelBoxShape.rectangle,
+    this.fontFamily,
   });
 
   final String id;
@@ -188,6 +249,20 @@ class LabelComponent {
   /// where black text would be invisible.
   final bool whiteText;
 
+  /// `text`/`dateTime` components only.
+  final bool italic;
+
+  /// `text`/`dateTime` components only: rotates the text around its box's
+  /// center by this many degrees (clockwise).
+  final double rotationDegrees;
+
+  /// `box` components only.
+  final LabelBoxShape boxShape;
+
+  /// `text`/`dateTime` components only: a Google Fonts family name (see
+  /// [LabelFontFamily.options]), or null for the platform default font.
+  final String? fontFamily;
+
   LabelComponent copyWith({
     String? fieldKey,
     bool clearFieldKey = false,
@@ -206,6 +281,11 @@ class LabelComponent {
     BarcodeSymbology? barcodeSymbology,
     bool? filled,
     bool? whiteText,
+    bool? italic,
+    double? rotationDegrees,
+    LabelBoxShape? boxShape,
+    String? fontFamily,
+    bool clearFontFamily = false,
   }) {
     return LabelComponent(
       id: id,
@@ -226,6 +306,10 @@ class LabelComponent {
       barcodeSymbology: barcodeSymbology ?? this.barcodeSymbology,
       filled: filled ?? this.filled,
       whiteText: whiteText ?? this.whiteText,
+      italic: italic ?? this.italic,
+      rotationDegrees: rotationDegrees ?? this.rotationDegrees,
+      boxShape: boxShape ?? this.boxShape,
+      fontFamily: clearFontFamily ? null : (fontFamily ?? this.fontFamily),
     );
   }
 
@@ -248,6 +332,10 @@ class LabelComponent {
         'barcodeSymbology': barcodeSymbology.name,
         'filled': filled,
         'whiteText': whiteText,
+        'italic': italic,
+        'rotationDegrees': rotationDegrees,
+        'boxShape': boxShape.name,
+        'fontFamily': fontFamily,
       };
 
   factory LabelComponent.fromJson(Map<String, dynamic> json) {
@@ -279,6 +367,13 @@ class LabelComponent {
       ),
       filled: json['filled'] as bool? ?? false,
       whiteText: json['whiteText'] as bool? ?? false,
+      italic: json['italic'] as bool? ?? false,
+      rotationDegrees: (json['rotationDegrees'] as num?)?.toDouble() ?? 0,
+      boxShape: LabelBoxShape.values.firstWhere(
+        (s) => s.name == json['boxShape'],
+        orElse: () => LabelBoxShape.rectangle,
+      ),
+      fontFamily: json['fontFamily'] as String?,
     );
   }
 }

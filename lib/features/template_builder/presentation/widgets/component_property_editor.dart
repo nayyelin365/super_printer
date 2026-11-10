@@ -118,6 +118,35 @@ class ComponentPropertyEditor extends ConsumerWidget {
           const SizedBox(height: 12),
         ],
         if (component.type == LabelComponentType.text || component.type == LabelComponentType.dateTime) ...[
+          const _Label('Font Family'),
+          DropdownButtonFormField<String>(
+            key: ValueKey('fontfamily-${component.id}'),
+            initialValue: component.fontFamily ?? LabelFontFamily.defaultLabel,
+            // Some family names ("Playfair Display") are long enough that,
+            // without isExpanded, the dropdown sizes itself to fit the
+            // widest item and overflows its actual (narrower) parent width.
+            isExpanded: true,
+            items: [
+              const DropdownMenuItem(
+                value: LabelFontFamily.defaultLabel,
+                child: Text(LabelFontFamily.defaultLabel, overflow: TextOverflow.ellipsis),
+              ),
+              for (final family in LabelFontFamily.options)
+                DropdownMenuItem(
+                  value: family,
+                  child: Text(family, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              if (value == LabelFontFamily.defaultLabel) {
+                update((c) => c.copyWith(clearFontFamily: true));
+              } else {
+                update((c) => c.copyWith(fontFamily: value));
+              }
+            },
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -143,21 +172,32 @@ class ComponentPropertyEditor extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              const Text('Italic', style: TextStyle(fontSize: 13)),
+              Switch(
+                value: component.italic,
+                onChanged: (v) => update((c) => c.copyWith(italic: v)),
+              ),
+              const SizedBox(width: 8),
               const Text('White Text', style: TextStyle(fontSize: 13)),
               Switch(
                 value: component.whiteText,
                 onChanged: (v) => update((c) => c.copyWith(whiteText: v)),
               ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'For text on top of a filled box',
-                  style: TextStyle(fontSize: 11, color: Colors.black45),
-                ),
-              ),
             ],
+          ),
+          const Text(
+            'White text is for placing on top of a filled box',
+            style: TextStyle(fontSize: 11, color: Colors.black45),
+          ),
+          const SizedBox(height: 8),
+          _NumberField(
+            fieldId: '${component.id}-rotation',
+            label: 'Rotation (degrees)',
+            value: component.rotationDegrees,
+            onChanged: (v) => update((c) => c.copyWith(rotationDegrees: v)),
           ),
           const SizedBox(height: 8),
           const _Label('Alignment'),
@@ -176,6 +216,19 @@ class ComponentPropertyEditor extends ConsumerWidget {
           const SizedBox(height: 12),
         ],
         if (component.type == LabelComponentType.box) ...[
+          const _Label('Shape'),
+          DropdownButtonFormField<LabelBoxShape>(
+            key: ValueKey('boxshape-${component.id}'),
+            initialValue: component.boxShape,
+            items: const [
+              DropdownMenuItem(value: LabelBoxShape.rectangle, child: Text('Square / Rectangle')),
+              DropdownMenuItem(value: LabelBoxShape.oval, child: Text('Circle / Oval')),
+            ],
+            onChanged: (value) {
+              if (value != null) update((c) => c.copyWith(boxShape: value));
+            },
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               const Text('Filled', style: TextStyle(fontSize: 13)),
@@ -219,6 +272,48 @@ class ComponentPropertyEditor extends ConsumerWidget {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        const _Label('Align on Canvas'),
+        Builder(builder: (context) {
+          final designWidth = state.template.widthInches * 300;
+          final designHeight = state.template.heightInches * 300;
+          return Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _AlignButton(
+                icon: Icons.format_align_left,
+                tooltip: 'Left',
+                onTap: () => update((c) => c.copyWith(x: 0)),
+              ),
+              _AlignButton(
+                icon: Icons.format_align_center,
+                tooltip: 'Center Horizontally',
+                onTap: () => update((c) => c.copyWith(x: (designWidth - c.width) / 2)),
+              ),
+              _AlignButton(
+                icon: Icons.format_align_right,
+                tooltip: 'Right',
+                onTap: () => update((c) => c.copyWith(x: designWidth - c.width)),
+              ),
+              const SizedBox(width: 8),
+              _AlignButton(
+                icon: Icons.vertical_align_top,
+                tooltip: 'Top',
+                onTap: () => update((c) => c.copyWith(y: 0)),
+              ),
+              _AlignButton(
+                icon: Icons.vertical_align_center,
+                tooltip: 'Center Vertically',
+                onTap: () => update((c) => c.copyWith(y: (designHeight - c.height) / 2)),
+              ),
+              _AlignButton(
+                icon: Icons.vertical_align_bottom,
+                tooltip: 'Bottom',
+                onTap: () => update((c) => c.copyWith(y: designHeight - c.height)),
+              ),
+            ],
+          );
+        }),
         const SizedBox(height: 8),
         if (component.type == LabelComponentType.divider) ...[
           Row(
@@ -287,6 +382,28 @@ class ComponentPropertyEditor extends ConsumerWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _AlignButton extends StatelessWidget {
+  const _AlignButton({required this.icon, required this.tooltip, required this.onTap});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        icon: Icon(icon, size: 18),
+        onPressed: onTap,
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      ),
     );
   }
 }

@@ -89,6 +89,13 @@ dependencies:
   flutter_svg: ^2.2.1
   mobile_scanner: ^7.4.0
 
+  # Font family choices for custom text components in the Template Builder.
+  # Fetches a font's files on first use and caches them locally — after
+  # that, works fully offline. Falls back to the platform default font
+  # (never throws) if a fetch fails with no cache yet (e.g. first use with
+  # no internet).
+  google_fonts: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
