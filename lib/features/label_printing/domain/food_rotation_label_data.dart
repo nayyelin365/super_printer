@@ -12,6 +12,8 @@ class FoodRotationLabelData extends LabelData {
     this.employee = '',
     this.ph = '',
     this.showPh = false,
+    this.ingredientsText = '',
+    this.showIngredients = false,
   });
 
   final String foodName;
@@ -26,6 +28,14 @@ class FoodRotationLabelData extends LabelData {
   /// it either.
   final String ph;
   final bool showPh;
+
+  /// Optional ingredients list, shown under Employee. Hidden by default —
+  /// like [showPh], when false the renderer doesn't reserve space for it.
+  /// When shown, the renderer also tightens the spacing of everything
+  /// above it (prep date/time, the use-by box, employee) to make more
+  /// room, since this is typically 3-5 lines of text.
+  final String ingredientsText;
+  final bool showIngredients;
 
   @override
   LabelTemplateType get templateType => LabelTemplateType.foodRotation;
@@ -45,6 +55,8 @@ class FoodRotationLabelData extends LabelData {
     String? employee,
     String? ph,
     bool? showPh,
+    String? ingredientsText,
+    bool? showIngredients,
   }) {
     return FoodRotationLabelData(
       foodName: foodName ?? this.foodName,
@@ -53,6 +65,8 @@ class FoodRotationLabelData extends LabelData {
       employee: employee ?? this.employee,
       ph: ph ?? this.ph,
       showPh: showPh ?? this.showPh,
+      ingredientsText: ingredientsText ?? this.ingredientsText,
+      showIngredients: showIngredients ?? this.showIngredients,
     );
   }
 }

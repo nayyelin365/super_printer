@@ -39,19 +39,40 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
       Paint()..color = Colors.white,
     );
 
-    _paintFoodName(canvas, data);
+    // Ingredients (3-5 lines) needs real room, so when it's shown
+    // everything above it is tightened up a bit — food name moves up
+    // slightly, and the gaps between PH/prep date/the use-by box/employee
+    // all shrink — rather than ingredients competing for the same fixed
+    // layout and overflowing or getting cramped. With it hidden, every
+    // position/size below is exactly what it always was.
+    final compact = data.showIngredients;
+
+    _paintFoodName(canvas, data, centerY: compact ? 90 : 110);
 
     // PH sits right under the food name; when hidden, prep date/time and
     // the use-by box shift up to take its place rather than leaving a gap.
-    var top = 210.0;
+    var top = compact ? 170.0 : 210.0;
     if (data.showPh) {
-      _paintPh(canvas, data, 160);
-      top = 230;
+      _paintPh(canvas, data, compact ? 125 : 160);
+      top = compact ? 195 : 230;
     }
 
     _paintPrepDateTime(canvas, data, top);
-    _paintUseByBox(canvas, data, top + 70);
-    _paintEmployee(canvas, data);
+
+    final boxTop = top + (compact ? 55 : 70);
+    final boxHeight = compact ? 80.0 : 100.0;
+    final boxFontSize = compact ? 36.0 : 42.0;
+    _paintUseByBox(canvas, data, boxTop, height: boxHeight, fontSize: boxFontSize);
+
+    const employeeFontSize = 40.0;
+    final employeeCenterY = compact ? boxTop + boxHeight + 45 : 460.0;
+    _paintEmployee(canvas, data, centerY: employeeCenterY, fontSize: employeeFontSize);
+
+    if (data.showIngredients) {
+      // 4px smaller than Employee, per request.
+      _paintIngredients(canvas, data, top: employeeCenterY + 35, fontSize: employeeFontSize - 4);
+    }
+
     _paintOuterBorder(canvas);
   }
 
@@ -71,14 +92,14 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     );
   }
 
-  void _paintFoodName(Canvas canvas, FoodRotationLabelData data) {
+  void _paintFoodName(Canvas canvas, FoodRotationLabelData data, {required double centerY}) {
     final name = data.foodName.trim().isEmpty
         ? 'UNNAMED ITEM'
         : data.foodName.toUpperCase();
     _drawText(
       canvas,
       name,
-      center: const Offset(designWidth / 2, 110),
+      center: Offset(designWidth / 2, centerY),
       style: const TextStyle(
         color: Colors.black,
         fontSize: 45,
@@ -121,8 +142,14 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     );
   }
 
-  void _paintUseByBox(Canvas canvas, FoodRotationLabelData data, double top) {
-    final boxRect = Rect.fromLTWH(40, top, designWidth - 80, 100);
+  void _paintUseByBox(
+    Canvas canvas,
+    FoodRotationLabelData data,
+    double top, {
+    required double height,
+    required double fontSize,
+  }) {
+    final boxRect = Rect.fromLTWH(40, top, designWidth - 80, height);
     canvas.drawRect(
       boxRect,
       Paint()
@@ -133,18 +160,23 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
       canvas,
       'USE BY: ${_dateFormat.format(data.useBy)}',
       center: boxRect.center,
-      style: const TextStyle(
+      style: TextStyle(
         color: Colors.white,
-        fontSize: 42,
+        fontSize: fontSize,
         fontWeight: FontWeight.w800,
       ),
     );
   }
 
-  void _paintEmployee(Canvas canvas, FoodRotationLabelData data) {
-    const style = TextStyle(
+  void _paintEmployee(
+    Canvas canvas,
+    FoodRotationLabelData data, {
+    required double centerY,
+    required double fontSize,
+  }) {
+    final style = TextStyle(
       color: Colors.black,
-      fontSize: 40,
+      fontSize: fontSize,
       fontWeight: FontWeight.w700,
     );
 
@@ -153,8 +185,37 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     _drawText(
       canvas,
       text,
-      center: const Offset(designWidth / 2, 460),
+      center: Offset(designWidth / 2, centerY),
       style: style,
+    );
+  }
+
+  /// Under Employee — only painted when
+  /// [FoodRotationLabelData.showIngredients] is true. Left-aligned,
+  /// wrapping across up to 5 lines (the expected 3-5 line range), which
+  /// is why the caller compresses the layout above it to free up room
+  /// here rather than this competing for a fixed slot.
+  void _paintIngredients(
+    Canvas canvas,
+    FoodRotationLabelData data, {
+    required double top,
+    required double fontSize,
+  }) {
+    final text = data.ingredientsText.trim();
+    if (text.isEmpty) return;
+    _drawText(
+      canvas,
+      text,
+      left: 40,
+      top: top,
+      style: TextStyle(
+        color: Colors.black,
+        fontSize: fontSize,
+        fontWeight: FontWeight.w500,
+      ),
+      maxWidth: designWidth - 80,
+      maxLines: 5,
+      textAlign: TextAlign.left,
     );
   }
 
@@ -167,11 +228,12 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     required TextStyle style,
     double? maxWidth,
     int maxLines = 1,
+    TextAlign textAlign = TextAlign.center,
   }) {
     final painter = TextPainter(
       text: TextSpan(text: text, style: style),
       textDirection: ui.TextDirection.ltr,
-      textAlign: TextAlign.center,
+      textAlign: textAlign,
       ellipsis: maxWidth != null ? '…' : null,
       maxLines: maxLines,
     );

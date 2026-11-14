@@ -299,6 +299,24 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     );
   }
 
+  void updateIngredients(String value) {
+    final data = state.labelData;
+    if (data is! FoodRotationLabelData) return;
+    state = state.copyWith(
+      labelData: data.copyWith(ingredientsText: value),
+      resultMessage: () => null,
+    );
+  }
+
+  void toggleShowIngredients(bool value) {
+    final data = state.labelData;
+    if (data is! FoodRotationLabelData) return;
+    state = state.copyWith(
+      labelData: data.copyWith(showIngredients: value),
+      resultMessage: () => null,
+    );
+  }
+
   // ---- Sushi Template fields ---------------------------------------------
 
   void updateSushiProductTitle(String value) => _updateSushi((d) => d.copyWith(productTitle: value));
