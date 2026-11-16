@@ -12,6 +12,7 @@ class FoodModel {
     this.useByAt,
     this.employee,
     this.ph,
+    this.ingredientsText,
     this.color,
     this.targetTemperature,
   });
@@ -32,6 +33,10 @@ class FoodModel {
   final String? employee;
   final String? ph;
 
+  /// Saved Ingredients text for Food Rotation labels (3-5 lines, typically)
+  /// — same "only ever saved from the print page" lifecycle as [ph].
+  final String? ingredientsText;
+
   /// Category color picked when the food was added — shown as the card's
   /// accent so foods in the same category are easy to spot at a glance.
   /// Null means uncategorized (card falls back to a neutral look).
@@ -48,6 +53,7 @@ class FoodModel {
     DateTime? Function()? useByAt,
     String? Function()? employee,
     String? Function()? ph,
+    String? Function()? ingredientsText,
     Color? Function()? color,
     double? Function()? targetTemperature,
   }) {
@@ -58,6 +64,7 @@ class FoodModel {
       useByAt: useByAt != null ? useByAt() : this.useByAt,
       employee: employee != null ? employee() : this.employee,
       ph: ph != null ? ph() : this.ph,
+      ingredientsText: ingredientsText != null ? ingredientsText() : this.ingredientsText,
       color: color != null ? color() : this.color,
       targetTemperature:
           targetTemperature != null ? targetTemperature() : this.targetTemperature,
@@ -74,6 +81,7 @@ class FoodModel {
           : null,
       employee: json['employee'] as String?,
       ph: json['ph'] as String?,
+      ingredientsText: json['ingredientsText'] as String?,
       color: json['color'] != null ? Color(json['color'] as int) : null,
       targetTemperature: (json['targetTemperature'] as num?)?.toDouble(),
     );
@@ -87,6 +95,7 @@ class FoodModel {
       if (useByAt != null) 'useByAtMillis': useByAt!.millisecondsSinceEpoch,
       if (employee != null) 'employee': employee,
       if (ph != null) 'ph': ph,
+      if (ingredientsText != null) 'ingredientsText': ingredientsText,
       if (color != null) 'color': color!.toARGB32(),
       if (targetTemperature != null) 'targetTemperature': targetTemperature,
     };

@@ -18,6 +18,7 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
 
   static const _borderColor = Color(0xFFDBDBDB);
   static const _boxColor = Color(0xFF10202E);
+  static const _bottomMargin = 24.0;
 
   static final _dateFormat = DateFormat('MM/dd/yyyy - hh:mm a');
 
@@ -47,14 +48,14 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     // position/size below is exactly what it always was.
     final compact = data.showIngredients;
 
-    _paintFoodName(canvas, data, centerY: compact ? 90 : 110);
+    _paintFoodName(canvas, data, centerY: compact ? 75 : 110);
 
     // PH sits right under the food name; when hidden, prep date/time and
     // the use-by box shift up to take its place rather than leaving a gap.
-    var top = compact ? 170.0 : 210.0;
+    var top = compact ? 140.0 : 210.0;
     if (data.showPh) {
-      _paintPh(canvas, data, compact ? 125 : 160);
-      top = compact ? 195 : 230;
+      _paintPh(canvas, data, compact ? 100 : 160);
+      top = compact ? 165 : 230;
     }
 
     _paintPrepDateTime(canvas, data, top);
@@ -69,8 +70,20 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
     _paintEmployee(canvas, data, centerY: employeeCenterY, fontSize: employeeFontSize);
 
     if (data.showIngredients) {
-      // 4px smaller than Employee, per request.
-      _paintIngredients(canvas, data, top: employeeCenterY + 35, fontSize: employeeFontSize - 4);
+      final ingredientsTop = employeeCenterY + 35;
+      // 3px smaller than Employee, per request — but see _paintIngredients:
+      // this is only the starting point, shrunk further if the text (at
+      // this script's actual line height — e.g. Myanmar needs taller lines
+      // than Latin at the same font size, for stacked vowel/tone marks)
+      // would otherwise run past the bottom margin and get cut off by the
+      // physical label edge instead of wrapping inside it.
+      _paintIngredients(
+        canvas,
+        data,
+        top: ingredientsTop,
+        fontSize: employeeFontSize - 3,
+        maxHeight: designHeight - ingredientsTop - _bottomMargin,
+      );
     }
 
     _paintOuterBorder(canvas);
@@ -195,28 +208,48 @@ class FoodRotationLabelRenderer extends LabelTemplateRenderer {
   /// wrapping across up to 5 lines (the expected 3-5 line range), which
   /// is why the caller compresses the layout above it to free up room
   /// here rather than this competing for a fixed slot.
+  ///
+  /// [fontSize] is only a starting point: some scripts (Myanmar, with its
+  /// stacked vowel/tone marks, in particular) render noticeably taller
+  /// per line than Latin text does at the same font size, so 5 lines at
+  /// [fontSize] can run past [maxHeight] — physically past the label's
+  /// own edge once printed — well before `maxLines` alone would trigger
+  /// an ellipsis. Shrinking the font (not the margins) until the text
+  /// actually fits keeps every line on the label whatever script it's in,
+  /// down to [_minIngredientsFontSize] as a floor so it never becomes
+  /// illegibly small.
+  static const _minIngredientsFontSize = 21.0;
+
   void _paintIngredients(
     Canvas canvas,
     FoodRotationLabelData data, {
     required double top,
     required double fontSize,
+    required double maxHeight,
   }) {
     final text = data.ingredientsText.trim();
     if (text.isEmpty) return;
-    _drawText(
-      canvas,
-      text,
-      left: 40,
-      top: top,
-      style: TextStyle(
-        color: Colors.black,
-        fontSize: fontSize,
-        fontWeight: FontWeight.w500,
-      ),
-      maxWidth: designWidth - 80,
-      maxLines: 5,
-      textAlign: TextAlign.left,
-    );
+
+    final maxWidth = designWidth - 80;
+    var size = fontSize;
+    TextPainter buildPainter(double size) => TextPainter(
+          text: TextSpan(
+            text: text,
+            style: TextStyle(color: Colors.black, fontSize: size, fontWeight: FontWeight.w500),
+          ),
+          textDirection: ui.TextDirection.ltr,
+          textAlign: TextAlign.left,
+          ellipsis: '…',
+          maxLines: 5,
+        )..layout(maxWidth: maxWidth);
+
+    var painter = buildPainter(size);
+    while (painter.height > maxHeight && size > _minIngredientsFontSize) {
+      size -= 2;
+      painter = buildPainter(size);
+    }
+
+    painter.paint(canvas, Offset(40, top));
   }
 
   double _drawText(

@@ -548,6 +548,7 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
       LabelTemplateType.foodRotation => () {
           final now = DateTime.now();
           final ph = food?.ph ?? '';
+          final ingredientsText = food?.ingredientsText ?? '';
           return FoodRotationLabelData(
             foodName: foodName ?? '',
             prepDateTime: now,
@@ -555,6 +556,8 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
             employee: food?.employee ?? '',
             ph: ph,
             showPh: ph.trim().isNotEmpty,
+            ingredientsText: ingredientsText,
+            showIngredients: ingredientsText.trim().isNotEmpty,
           );
         }(),
       LabelTemplateType.sushiTemplate => SushiTemplateLabelData.initial(),
@@ -567,10 +570,10 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
     };
   }
 
-  /// Saves the current Use By hours, employee, and pH back onto the food
-  /// catalog entry for this label's food name, so selecting that food
-  /// again later pre-fills them instead of the bare defaults. A no-op if
-  /// this isn't a Food Rotation label or the food name is blank.
+  /// Saves the current Use By hours, employee, pH, and ingredients back
+  /// onto the food catalog entry for this label's food name, so selecting
+  /// that food again later pre-fills them instead of the bare defaults.
+  /// A no-op if this isn't a Food Rotation label or the food name is blank.
   void saveCurrentFoodSettings() {
     final data = state.labelData;
     if (data is! FoodRotationLabelData) return;
@@ -586,6 +589,9 @@ class LabelPrintController extends StateNotifier<LabelPrintState> {
           useByAt: state.useByMode == UseByMode.dateTime ? data.useBy : null,
           employee: data.employee.trim().isEmpty ? null : data.employee.trim(),
           ph: data.showPh && data.ph.trim().isNotEmpty ? data.ph.trim() : null,
+          ingredientsText: data.showIngredients && data.ingredientsText.trim().isNotEmpty
+              ? data.ingredientsText.trim()
+              : null,
         );
 
     state = state.copyWith(resultMessage: () => 'Saved settings for "$name".');

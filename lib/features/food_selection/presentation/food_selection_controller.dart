@@ -87,6 +87,7 @@ class FoodCatalogController extends StateNotifier<List<FoodModel>> {
     DateTime? useByAt,
     String? employee,
     String? ph,
+    String? ingredientsText,
   }) async {
     final existing = state.where((food) => food.name == name).firstOrNull;
     if (existing == null) return;
@@ -98,6 +99,7 @@ class FoodCatalogController extends StateNotifier<List<FoodModel>> {
         useByAt: () => useByAt,
         employee: () => employee,
         ph: () => ph,
+        ingredientsText: () => ingredientsText,
       ),
     );
   }
